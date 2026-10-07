@@ -1,0 +1,36 @@
+[project]
+name = "diffusion-from-scratch"
+version = "0.1.0"
+description = "Class-conditional DDPM with classifier-free guidance and DDIM sampling, written from scratch in PyTorch"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "tqdm",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.setuptools]
+packages = ["ddpm"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
