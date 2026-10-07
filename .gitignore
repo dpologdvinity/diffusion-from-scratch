@@ -5,3 +5,5 @@ data/
 checkpoints/
 *.egg-info/
 .pytest_cache/
+results/runs/
+results/*.out

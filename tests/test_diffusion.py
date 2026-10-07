@@ -142,3 +142,20 @@ def test_unet_shapes_and_conditioning():
     a = model(x, same_t, torch.zeros(4, dtype=torch.long))
     b = model(x, same_t, torch.ones(4, dtype=torch.long))
     assert not torch.allclose(a, b), "class label must change the prediction"
+
+
+# --- metrics ------------------------------------------------------------------------------
+
+
+def test_fid_and_kid_are_near_zero_for_same_distribution_and_grow_with_shift():
+    from ddpm.metrics import frechet_distance, kernel_distance
+
+    g = torch.Generator().manual_seed(0)
+    a = torch.randn(2000, 8, generator=g)
+    b = torch.randn(2000, 8, generator=g)
+    shifted = b + 1.0
+    assert frechet_distance(a, b) < 0.05
+    # Mean shift of 1 in each of 8 dims -> ||mu_a - mu_b||^2 = 8.
+    assert frechet_distance(a, shifted) == pytest.approx(8.0, rel=0.1)
+    assert abs(kernel_distance(a, b)) < 0.01
+    assert kernel_distance(a, shifted) > 10 * abs(kernel_distance(a, b))
