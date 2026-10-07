@@ -60,9 +60,9 @@ class UNet(nn.Module):
     def __init__(
         self,
         in_ch: int = 1,
-        base_ch: int = 32,
-        ch_mults: tuple = (1, 2, 4),
-        num_res_blocks: int = 2,
+        base_ch: int = 16,
+        ch_mults: tuple = (1, 2, 3),
+        num_res_blocks: int = 1,
         attn_levels: tuple = (2,),
         num_classes: int = 10,
         dropout: float = 0.1,
@@ -111,7 +111,9 @@ class UNet(nn.Module):
                 self.up.append(block)
                 ch = out_ch
             if level != 0:
-                self.up.append(nn.ModuleList([nn.Upsample(scale_factor=2, mode="nearest"), nn.Conv2d(ch, ch, 3, padding=1)]))
+                # No conv after upsampling: the next ResBlock convolves the upsampled map anyway,
+                # and a full-resolution conv here would cost ~20% of the network's FLOPs.
+                self.up.append(nn.ModuleList([nn.Upsample(scale_factor=2, mode="nearest")]))
 
         self.out = nn.Sequential(nn.GroupNorm(8, ch), nn.SiLU(), nn.Conv2d(ch, in_ch, 3, padding=1))
         # Start as a zero predictor so early training is stable.
