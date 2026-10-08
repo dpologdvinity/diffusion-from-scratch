@@ -34,8 +34,9 @@ from .train import load_ema_model
 RESULTS = Path("results")
 
 
-def run_name(method: str, steps: int, guidance: float) -> str:
-    return f"{method}{steps}_w{guidance:g}"
+def run_name(method: str, steps: int, guidance: float, eta: float = 0.0) -> str:
+    name = f"{method}{steps}_w{guidance:g}"
+    return f"{name}_eta{eta:g}" if method == "ddim" and eta else name
 
 
 def runs_dir(dataset: str) -> Path:
@@ -46,22 +47,42 @@ def balanced_labels(n: int, num_classes: int = 10) -> torch.Tensor:
     return torch.arange(num_classes).repeat(n // num_classes + 1)[:n]
 
 
+def load_runs(dataset: str) -> dict[str, dict]:
+    """All generated configs, with shards (`name.partIofK.pt`) concatenated back into one run."""
+    parts: dict[str, list] = {}
+    for path in sorted(runs_dir(dataset).glob("*.pt")):
+        parts.setdefault(path.stem.split(".part")[0], []).append(torch.load(path))
+    runs = {}
+    for name, rs in parts.items():
+        runs[name] = {**rs[0], "x": torch.cat([r["x"] for r in rs]), "y": torch.cat([r["y"] for r in rs]),
+                      "seconds": sum(r["seconds"] for r in rs)}
+    return runs
+
+
 def cmd_generate(args):
     model, sched, _ = load_ema_model(Path(args.ckpt_dir) / f"{args.dataset}.pt")
     steps = sched.T if args.method == "ddpm" else args.steps
+    name = run_name(args.method, steps, args.guidance, args.eta)
     y_all = balanced_labels(args.n)
-    out, secs = [], 0.0
-    for i in range(0, args.n, args.batch):
+    # Batches are dealt round-robin to shards; seeds depend only on the batch offset, so a
+    # sharded run produces exactly the same samples as an unsharded one.
+    starts = [i for b, i in enumerate(range(0, args.n, args.batch)) if b % args.num_shards == args.shard]
+    xs, ys, secs = [], [], 0.0
+    for i in starts:
         y = y_all[i : i + args.batch]
         g = torch.Generator().manual_seed(args.seed + i)
         t0 = time.perf_counter()
-        out.append(sample(model, sched, (len(y), 1, 28, 28), y, method=args.method, steps=steps, guidance=args.guidance, generator=g))
+        xs.append(sample(model, sched, (len(y), 1, 28, 28), y, method=args.method, steps=steps, eta=args.eta,
+                         guidance=args.guidance, generator=g))
+        ys.append(y)
         secs += time.perf_counter() - t0
-        print(f"  {args.dataset} {run_name(args.method, steps, args.guidance)}: {i + len(y)}/{args.n} ({secs:.0f}s)", flush=True)
-    path = runs_dir(args.dataset) / f"{run_name(args.method, steps, args.guidance)}.pt"
+        print(f"  {args.dataset} {name}: batch at {i} done ({secs:.0f}s)", flush=True)
+    suffix = f".part{args.shard}of{args.num_shards}" if args.num_shards > 1 else ""
+    path = runs_dir(args.dataset) / f"{name}{suffix}.pt"
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
-        {"x": torch.cat(out).half(), "y": y_all, "method": args.method, "steps": steps, "guidance": args.guidance, "seconds": secs},
+        {"x": torch.cat(xs).half(), "y": torch.cat(ys), "method": args.method, "steps": steps, "guidance": args.guidance,
+         "eta": args.eta, "seconds": secs},
         path,
     )
     print(f"saved {path}")
@@ -80,12 +101,11 @@ def cmd_report(args):
         return 1000 * kernel_distance(f / feat_scale, kid_ref)
 
     rows = []
-    for path in sorted(runs_dir(args.dataset).glob("*.pt")):
-        r = torch.load(path)
+    for name, r in load_runs(args.dataset).items():
         x = r["x"].float()
         f, p = predict(clf, x)
         rows.append({
-            "run": path.stem, "method": r["method"], "steps": r["steps"], "guidance": r["guidance"], "n": len(x),
+            "run": name, "method": r["method"], "steps": r["steps"], "guidance": r["guidance"], "eta": r.get("eta", 0.0), "n": len(x),
             "class_acc": (p == r["y"]).float().mean().item(),
             "fid": frechet_distance(f, f_test),
             "kid_x1000": kid(f),
@@ -118,7 +138,7 @@ def cmd_report(args):
 
 
 def plot_tradeoffs(dataset: str, rows: list, floor: dict, w_sweep: float):
-    step_rows = sorted([r for r in rows if r["guidance"] == w_sweep], key=lambda r: r["steps"])
+    step_rows = sorted([r for r in rows if r["guidance"] == w_sweep and not r.get("eta")], key=lambda r: r["steps"])
     if step_rows:
         fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
         for ax, key, label in [(axes[0], "fid", "FID (classifier features) ↓"), (axes[1], "class_acc", "class accuracy ↑")]:
@@ -137,7 +157,7 @@ def plot_tradeoffs(dataset: str, rows: list, floor: dict, w_sweep: float):
         fig.savefig(RESULTS / f"{dataset}_steps_tradeoff.png", dpi=130)
         plt.close(fig)
 
-    g_rows = sorted([r for r in rows if r["method"] == "ddim" and r["steps"] == 50], key=lambda r: r["guidance"])
+    g_rows = sorted([r for r in rows if r["method"] == "ddim" and r["steps"] == 50 and not r.get("eta")], key=lambda r: r["guidance"])
     if len(g_rows) > 1:
         fig, ax1 = plt.subplots(figsize=(5, 3.4))
         ws = [r["guidance"] for r in g_rows]
@@ -179,11 +199,10 @@ def cmd_timing(args):
 
 def cmd_figures(args):
     names = data.CLASS_NAMES[args.dataset]
-    rdir = runs_dir(args.dataset)
+    runs = load_runs(args.dataset)
 
     def load_run(name):
-        path = rdir / f"{name}.pt"
-        return torch.load(path) if path.exists() else None
+        return runs.get(name)
 
     def first_per_class(r, k):
         """k samples per class, as a (10*k) batch ordered class by class."""
@@ -264,6 +283,9 @@ def main():
             s.add_argument("--n", type=int, default=500)
             s.add_argument("--batch", type=int, default=250)
             s.add_argument("--seed", type=int, default=0)
+            s.add_argument("--eta", type=float, default=0.0, help="DDIM stochasticity (0 = deterministic, 1 = DDPM-like)")
+            s.add_argument("--shard", type=int, default=0, help="which shard of the batches to generate")
+            s.add_argument("--num-shards", type=int, default=1, help="split generation across this many processes")
         if name == "timing":
             s.add_argument("--batch", type=int, default=20)
     args = p.parse_args()

@@ -159,3 +159,24 @@ def test_fid_and_kid_are_near_zero_for_same_distribution_and_grow_with_shift():
     assert frechet_distance(a, shifted) == pytest.approx(8.0, rel=0.1)
     assert abs(kernel_distance(a, b)) < 0.01
     assert kernel_distance(a, shifted) > 10 * abs(kernel_distance(a, b))
+
+
+# --- evaluation bookkeeping ----------------------------------------------------------------
+
+
+def test_run_names_and_shard_merging(tmp_path, monkeypatch):
+    import ddpm.evaluate as ev
+
+    assert ev.run_name("ddpm", 1000, 2.0) == "ddpm1000_w2"
+    assert ev.run_name("ddim", 50, 0.0, eta=1.0) == "ddim50_w0_eta1"
+    assert ev.run_name("ddpm", 1000, 2.0, eta=1.0) == "ddpm1000_w2"  # eta only applies to DDIM
+
+    monkeypatch.setattr(ev, "RESULTS", tmp_path)
+    d = ev.runs_dir("mnist")
+    d.mkdir(parents=True)
+    for i in range(2):
+        torch.save({"x": torch.full((3, 1, 2, 2), float(i)), "y": torch.full((3,), i), "method": "ddim", "steps": 50,
+                    "guidance": 2.0, "seconds": 1.5}, d / f"ddim50_w2.part{i}of2.pt")
+    runs = ev.load_runs("mnist")
+    assert list(runs) == ["ddim50_w2"]
+    assert runs["ddim50_w2"]["x"].shape[0] == 6 and runs["ddim50_w2"]["seconds"] == 3.0
