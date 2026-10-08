@@ -1,5 +1,7 @@
 # Diffusion from scratch
 
+[![tests](https://github.com/dpologdvinity/diffusion-from-scratch/actions/workflows/tests.yml/badge.svg)](https://github.com/dpologdvinity/diffusion-from-scratch/actions/workflows/tests.yml)
+
 A class-conditional **DDPM** with **classifier-free guidance** and **DDIM** sampling, written from scratch in PyTorch (no `diffusers` or other diffusion libraries) and trained entirely on a laptop CPU.
 
 <!-- RESULTS -->
@@ -42,18 +44,29 @@ Classifier-free guidance on 8 Gaussians, asking for one mode. w = 0 is the uncon
 ## Reproduce
 
 ```bash
-uv sync                                   # CPU-only PyTorch
-uv run pytest                             # sampler math, schedule, CFG, UNet, metrics
-
-uv run python -m ddpm.toy                 # 2D experiments (~5 min)
-
-# MNIST: data-parallel over single-threaded CPU workers (batch size is per worker)
-OMP_NUM_THREADS=1 uv run torchrun --standalone --nproc-per-node 5 -m ddpm.train \
-    --dataset mnist --threads 1 --batch-size 26 --lr 4e-4 --warmup 200 --minutes 60
-
-uv run python -m ddpm.classifier --dataset mnist   # evaluation classifier
-scripts/run_eval.sh mnist 200 3                    # samples, metrics, figures, timing
+uv sync                         # CPU-only PyTorch
+make test                       # sampler math, schedule, CFG, UNet, metrics
+make toy                        # 2D experiments (~5 min)
+make train MINUTES=60           # MNIST, data-parallel over single-threaded CPU workers
+make eval N=200                 # samples for every sampler config -> metrics, figures, timing
 ```
+
+Variables: `DATASET=mnist|fashion`, `WORKERS`, `MINUTES`, `N`, `JOBS`; `make resume` continues from the last checkpoint. Long jobs run under `nice` with `OMP_NUM_THREADS=1`: on a contended CPU, single-threaded DDP workers sync once per step and scale far better than intra-op threads.
+
+Larger evaluations can split the expensive DDPM run across processes; shards reproduce the unsharded samples exactly and are merged automatically:
+
+```bash
+for i in 0 1 2 3; do uv run python -m ddpm.evaluate generate --method ddpm --n 1000 --batch 50 --shard $i --num-shards 4 & done; wait
+```
+
+## Roadmap
+
+- [x] DDPM, DDIM, classifier-free guidance, UNet, CPU data-parallel training
+- [x] 2D toy experiments and MNIST evaluation (class accuracy, FID/KID, guidance sweep, timing)
+- [ ] Longer MNIST training run (current model saw ~3 epochs)
+- [ ] FashionMNIST model and evaluation
+- [ ] Larger evaluation (N = 1000 per config) for tighter FID/KID estimates
+- [ ] Ablations: cosine vs linear schedule; DDIM η ∈ {0, 0.5, 1}
 
 ## Evaluation caveats
 
