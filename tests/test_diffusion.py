@@ -85,6 +85,11 @@ def test_samplers_recover_x0_with_oracle_model(sched, method, steps):
     torch.testing.assert_close(out, x0.expand(4, 2), rtol=0, atol=1e-3)
 
 
+def test_single_step_ddim_starts_from_pure_noise():
+    # One step must evaluate the model at t = T-1, not at t = 0 on pure noise.
+    assert ddim_timesteps(1000, 1) == [999]
+
+
 def test_ddim_timesteps_cover_range():
     ts = ddim_timesteps(1000, 50)
     assert ts[0] == 999 and ts[-1] == 0 and len(ts) == 50

@@ -82,7 +82,9 @@ def ddim_step(sched: NoiseSchedule, x_t, t, t_prev, eps, noise, eta: float = 0.0
 
 
 def ddim_timesteps(T: int, steps: int) -> list[int]:
-    """Evenly spaced subsequence of [0, T-1], descending, always including T-1 and 0."""
+    """Evenly spaced subsequence of [0, T-1], descending, always including T-1 (and 0 when steps > 1)."""
+    if steps == 1:
+        return [T - 1]  # a single step must start from pure noise, not t = 0
     ts = torch.linspace(0, T - 1, steps).round().long().unique().tolist()
     return ts[::-1]
 
