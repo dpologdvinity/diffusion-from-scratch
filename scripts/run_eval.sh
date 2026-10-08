@@ -8,8 +8,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DATASET=${1:-mnist}
-N=${2:-200}
-JOBS=${3:-3}
+N=${2:-100}
+JOBS=${3:-2}
 W=2  # guidance weight for the step-count sweep
 
 export OMP_NUM_THREADS=1
