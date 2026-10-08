@@ -13,7 +13,10 @@ JOBS=${3:-2}
 W=2  # guidance weight for the step-count sweep
 
 export OMP_NUM_THREADS=1
-run() { nice -n 10 uv run python -m ddpm.evaluate "$@"; }
+# CKPT_DIR / RESULTS_DIR select a different model and output location (e.g. an ablation).
+CKPT_DIR=${CKPT_DIR:-checkpoints}
+RESULTS_DIR=${RESULTS_DIR:-results}
+run() { nice -n 10 uv run python -m ddpm.evaluate "$@" --ckpt-dir "$CKPT_DIR" --results-dir "$RESULTS_DIR"; }
 
 # DDPM (1000 steps) dominates the cost, so it is split into $JOBS shards that run in parallel;
 # shards reproduce the unsharded samples exactly and are merged by `report`.
@@ -41,8 +44,8 @@ configs+=(
 )
 
 # Start clean: leftover samples from an earlier run (e.g. a different shard count) would be merged in.
-rm -rf results/runs/"$DATASET"
-mkdir -p results/runs/"$DATASET"
+rm -rf "$RESULTS_DIR"/runs/"$DATASET"
+mkdir -p "$RESULTS_DIR"/runs/"$DATASET"
 for cfg in "${configs[@]}"; do
   while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n; done
   # shellcheck disable=SC2086

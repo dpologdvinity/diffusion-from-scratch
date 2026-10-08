@@ -273,6 +273,7 @@ def main():
         s = sub.add_parser(name)
         s.add_argument("--dataset", choices=list(data.DATASETS), default="mnist")
         s.add_argument("--ckpt-dir", default="checkpoints")
+        s.add_argument("--results-dir", default="results", help="where metrics, figures, and samples go")
         s.add_argument("--threads", type=int, default=1)
         s.add_argument("--sweep-guidance", type=float, default=2.0, help="guidance weight used for the steps sweep")
         if name in ("generate", "timing"):
@@ -289,6 +290,9 @@ def main():
         if name == "timing":
             s.add_argument("--batch", type=int, default=20)
     args = p.parse_args()
+    global RESULTS
+    RESULTS = Path(args.results_dir)
+    RESULTS.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(args.threads)
     {"generate": cmd_generate, "report": cmd_report, "timing": cmd_timing, "figures": cmd_figures}[args.cmd](args)
 

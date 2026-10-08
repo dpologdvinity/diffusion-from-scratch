@@ -185,3 +185,14 @@ def test_run_names_and_shard_merging(tmp_path, monkeypatch):
     runs = ev.load_runs("mnist")
     assert list(runs) == ["ddim50_w2"]
     assert runs["ddim50_w2"]["x"].shape[0] == 6 and runs["ddim50_w2"]["seconds"] == 3.0
+
+
+def test_results_dir_flag_redirects_all_outputs(tmp_path, monkeypatch):
+    import ddpm.evaluate as ev
+
+    seen = {}
+    monkeypatch.setattr(ev, "cmd_report", lambda args: seen.update(results=ev.RESULTS, runs=ev.runs_dir(args.dataset)))
+    monkeypatch.setattr("sys.argv", ["evaluate", "report", "--results-dir", str(tmp_path / "cosine")])
+    ev.main()
+    assert seen["results"] == tmp_path / "cosine"
+    assert seen["runs"] == tmp_path / "cosine" / "runs" / "mnist"

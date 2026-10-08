@@ -3,8 +3,11 @@
 #   make train DATASET=fashion MINUTES=180 WORKERS=2
 DATASET ?= mnist
 MINUTES ?= 60
+STEPS   ?= 100000
 WORKERS ?= 2
 BATCH   ?= 26
+SCHEDULE ?= linear
+OUT     ?= checkpoints
 N       ?= 100
 JOBS    ?= 2
 
@@ -25,12 +28,14 @@ toy:
 train:
 	nice -n 10 uv run torchrun --standalone --nproc-per-node $(WORKERS) -m ddpm.train \
 	  --dataset $(DATASET) --threads 1 --batch-size $(BATCH) --lr 4e-4 --warmup 200 \
-	  --steps 100000 --minutes $(MINUTES) --log-every 50 --ckpt-every 250 --preview-every 1000
+	  --steps $(STEPS) --minutes $(MINUTES) --schedule $(SCHEDULE) --out $(OUT) \
+	  --log-every 50 --ckpt-every 250 --preview-every 1000
 
 resume:
 	nice -n 10 uv run torchrun --standalone --nproc-per-node $(WORKERS) -m ddpm.train \
 	  --dataset $(DATASET) --threads 1 --batch-size $(BATCH) --lr 4e-4 --warmup 200 \
-	  --steps 100000 --minutes $(MINUTES) --log-every 50 --ckpt-every 250 --preview-every 1000 --resume
+	  --steps $(STEPS) --minutes $(MINUTES) --schedule $(SCHEDULE) --out $(OUT) \
+	  --log-every 50 --ckpt-every 250 --preview-every 1000 --resume
 
 eval:
 	scripts/run_eval.sh $(DATASET) $(N) $(JOBS)
