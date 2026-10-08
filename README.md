@@ -15,18 +15,29 @@ Class-conditional samples, DDIM 50 steps, guidance w = 2. Each row is the reques
 
 ![MNIST samples](results/mnist_samples.png)
 
-**DDIM matches 1000-step DDPM at 20× fewer steps.** At guidance w = 2, DDIM with 50 steps reaches the same class accuracy as DDPM with 1000 (100%) at a lower FID (32.4 vs 44.0, against a real-image floor of 22.4), while sampling 16–19× faster in wall-clock time. Even 10 steps keeps 100% accuracy.
+**DDIM matches 1000-step DDPM at 20× fewer steps.** At guidance w = 2, DDIM with 50 steps reaches the same class accuracy as DDPM with 1000 (99.9%) at a lower FID (19.0 vs 28.0; real images score 3.1), while sampling 18–21× faster in wall-clock time. Even 10 steps keeps 99.9% accuracy.
 
 | sampler | steps | class acc ↑ | FID ↓ | KID×1000 ↓ | wall-clock speedup |
 |---|---|---|---|---|---|
-| DDPM | 1000 | 100% | 44.0 | 64.4 | 1× |
-| DDIM | 100 | 100% | 32.4 | 2.0 | — |
-| DDIM | 50 | 100% | 32.4 | 2.0 | 16–19× |
-| DDIM | 20 | 100% | 30.9 | -5.0 | 37× |
-| DDIM | 10 | 100% | 28.7 | -18.2 | 75× |
-| real images | — | 100% | 22.4 | -32.2 | — |
+| DDPM | 1000 | 99.9% | 28.0 | 132.1 | 1× |
+| DDIM | 100 | 99.8% | 18.7 | 78.8 | — |
+| DDIM | 50 | 99.9% | 19.0 | 80.7 | 18–21× |
+| DDIM | 20 | 99.9% | 19.4 | 81.4 | 51× |
+| DDIM | 10 | 99.9% | 18.6 | 72.2 | 113× |
+| real images | — | 99.0% | 3.1 | 0.4 | — |
 
-N = 100 samples per config. Speedups come from a sequential benchmark on one CPU thread (batch 10); DDIM 50 was timed before and after DDPM to bracket changes in background load, and the step ratio is exactly 20×. With N = 100, differences of a few FID points are within noise; the gap to DDPM is larger, and KID agrees with it.
+N = 1,000 samples per config. Speedups come from a sequential benchmark on one CPU thread (batch 10); DDIM 50 was timed before and after DDPM to bracket changes in background load, and the step ratio is exactly 20×.
+
+**Why DDIM beats DDPM here: it's the noise, not the step count.** Turning DDIM's stochasticity back on (η) at a fixed 50 steps walks FID back up to DDPM's level; at 10 steps, full stochasticity hurts badly, because each large step injects noise the model has too few remaining steps to remove:
+
+| sampler (w = 2) | class acc ↑ | FID ↓ |
+|---|---|---|
+| DDIM 50, η = 0 | 99.9% | 19.0 |
+| DDIM 50, η = 0.5 | 99.7% | 22.6 |
+| DDIM 50, η = 1 | 100.0% | 30.1 |
+| DDPM 1000 | 99.9% | 28.0 |
+| DDIM 10, η = 0 | 99.9% | 18.6 |
+| DDIM 10, η = 1 | 100.0% | 36.4 |
 
 Same starting noise, same label, different samplers. Deterministic DDIM (η = 0) gives nearly the same image at every step count; DDPM's stochastic steps take a different path and, at this guidance weight, produce visibly thinner strokes:
 
@@ -34,17 +45,17 @@ Same starting noise, same label, different samplers. Deterministic DDIM (η = 0)
 
 ![steps trade-off](results/mnist_steps_tradeoff.png)
 
-**Classifier-free guidance trades diversity for fidelity.** w = 1 (the plain conditional model) gives the best FID (26.7) at 90% class accuracy; w = 2 reaches 100% accuracy at FID 32.4; past that, samples stay on-class but FID climbs as strokes thicken and variety collapses. w = 0 is the unconditional model (near-chance accuracy), which saw only 10% of training batches:
+**Classifier-free guidance trades diversity for fidelity.** w = 1 (the plain conditional model) gives by far the best FID (8.5) at 92.7% class accuracy; w = 2 buys 99.9% accuracy at FID 19.0; past that, samples stay on-class but FID climbs as strokes thicken and variety collapses. w = 0 is the unconditional model (chance accuracy), which saw only 10% of training batches:
 
 | guidance w (DDIM 50) | class acc ↑ | FID ↓ |
 |---|---|---|
-| 0 | 14% | 107.6 |
-| 1 | 90% | 26.7 |
-| 2 | 100% | 32.4 |
-| 3 | 100% | 56.4 |
-| 5 | 100% | 88.8 |
+| 0 | 10.7% | 76.4 |
+| 1 | 92.7% | 8.5 |
+| 2 | 99.9% | 19.0 |
+| 3 | 100.0% | 45.4 |
+| 5 | 100.0% | 79.0 |
 
-Longer training shifted this trade-off: after 1,812 steps the plain conditional model reached only 75% accuracy (FID 96) and needed w = 2 to look right; after 15,351 steps it reaches 90% (FID 27), so the FID-optimal guidance weight dropped from 2 to 1.
+Longer training shifted this trade-off: after 1,812 steps the plain conditional model reached only 75% accuracy and needed w = 2 to look right; after 15,351 steps it reaches 93%, so the FID-optimal guidance weight dropped from 2 to 1.
 
 ![guidance comparison](results/mnist_guidance_comparison.png)
 
@@ -116,13 +127,14 @@ for i in 0 1 2 3; do uv run python -m ddpm.evaluate generate --method ddpm --n 1
 - [x] 2D toy experiments and MNIST evaluation (class accuracy, FID/KID, guidance sweep, timing)
 - [x] Longer MNIST training run (15,351 steps, about 16 epochs)
 - [ ] FashionMNIST model and evaluation
-- [ ] Larger evaluation (N = 1000 per config) for tighter FID/KID estimates
-- [ ] Ablations: cosine vs linear schedule; DDIM η ∈ {0, 0.5, 1}
+- [x] Larger evaluation (N = 1,000 per config) for tighter FID/KID estimates
+- [x] DDIM η ablation (η ∈ {0, 0.5, 1})
+- [ ] Cosine vs linear noise schedule (needs a full retrain)
 
 ## Evaluation caveats
 
-- **FID here is not comparable to published FIDs.** Inception-v3 features suit 28×28 grayscale digits poorly, so FID and KID are computed on the 64-d penultimate features of a small CNN trained on MNIST. Scores are meaningful only relative to each other and to the "real images" floor at the same sample size.
-- **Small sample sizes.** Samples were generated on a shared laptop CPU, so each config uses N = 100 (the 1000-step DDPM run alone is 200k network evaluations). FID is biased upward at small N (hence the equal-N real-image floor); KID is unbiased and is the more reliable of the two here.
+- **FID here is not comparable to published FIDs.** Inception-v3 features suit 28×28 grayscale digits poorly, so FID and KID are computed on the 64-d penultimate features of a small CNN trained on the same dataset. Scores are meaningful only relative to each other and to the "real images" floor at the same sample size.
+- **Sample size.** Each config uses N = 1,000 samples (the 1000-step DDPM run alone is 2M network evaluations with guidance, about 2.5 hours on one CPU core). FID is biased at finite N, so every config, including the real-image floor, uses the same N. An earlier N = 100 run was too small: on FashionMNIST it scored real images worse than generated ones.
 - **Wall-clock timings** were measured on a machine running other jobs. Step counts are the load-independent measure; the timing table confirms the ratio holds in practice.
 
 ## References
