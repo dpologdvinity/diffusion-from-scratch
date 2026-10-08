@@ -198,3 +198,9 @@ def test_page_has_required_controls():
         assert f'id="{el_id}"' in html, el_id
     for input_id in re.findall(r'<input[^>]*\bid="([^"]+)"', html):
         assert f'for="{input_id}"' in html, f"input #{input_id} has no label"
+
+
+def test_live_result_hidden_until_generated():
+    html = (WEB / "index.html").read_text()
+    assert re.search(r'<div class="live-output"[^>]*\bhidden\b', html)
+    assert '.live-output").hidden = false' in (WEB / "app.js").read_text()

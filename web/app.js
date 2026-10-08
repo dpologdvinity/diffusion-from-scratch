@@ -156,6 +156,7 @@ function setupLive() {
       }
       const steps = req.sampler === "ddpm" ? "DDPM 1000 steps" : `DDIM ${req.steps} steps`;
       $("live-meta").textContent = `Digit ${req.digit}, guidance ${req.guidance}, ${steps}, seed ${req.seed}: ${body.seconds}s on one CPU thread.`;
+      document.querySelector(".live-output").hidden = false;
       animate($("live-image"), body.frames, `Generated digit ${req.digit}, guidance ${req.guidance}, ${steps}.`, () => {});
     } catch {
       $("live-error").textContent = "Could not reach the local server.";
