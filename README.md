@@ -4,49 +4,55 @@
 
 A class-conditional **DDPM** with **classifier-free guidance** and **DDIM** sampling, written from scratch in PyTorch (no `diffusers` or other diffusion libraries) and trained entirely on a laptop CPU.
 
+## Try it
+
+- **In the browser:** [interactive demo](https://dpologdvinity.github.io/diffusion-from-scratch/). Drag the guidance and sampler sliders over precomputed samples (every setting starts from the same noise) and watch the digits denoise.
+- **Locally, with live sampling:** clone the repo, then `uv sync && make serve` and open http://127.0.0.1:8000. Pick any digit, seed, guidance weight, sampler, step count, and η; the model runs on one CPU thread. API docs are at `/api/docs`.
+
 ## Results (MNIST)
 
 Class-conditional samples, DDIM 50 steps, guidance w = 2. Each row is the requested class:
 
 ![MNIST samples](results/mnist_samples.png)
 
-**DDIM matches 1000-step DDPM at 20× fewer steps.** At guidance w = 2, DDIM with 50 steps reaches the same class accuracy as DDPM with 1000 (98%) and a slightly lower FID (26.1 vs 30.0, against a real-image floor of 22.4), while sampling 16–39× faster in wall-clock time. Even 10 steps keeps 96% accuracy.
+**DDIM matches 1000-step DDPM at 20× fewer steps.** At guidance w = 2, DDIM with 50 steps reaches the same class accuracy as DDPM with 1000 (100%) at a lower FID (32.4 vs 44.0, against a real-image floor of 22.4), while sampling 16–19× faster in wall-clock time. Even 10 steps keeps 100% accuracy.
 
-| sampler | steps | class acc ↑ | FID ↓ | KID×1000 | wall-clock speedup |
+| sampler | steps | class acc ↑ | FID ↓ | KID×1000 ↓ | wall-clock speedup |
 |---|---|---|---|---|---|
-| DDPM | 1000 | 98% | 30.0 | -5.0 | 1× |
-| DDIM | 100 | 98% | 26.7 | -21.2 | — |
-| DDIM | 50 | 98% | 26.1 | -22.9 | 16–39× |
-| DDIM | 20 | 97% | 25.1 | -24.0 | 95× |
-| DDIM | 10 | 96% | 25.0 | -19.3 | 185× |
+| DDPM | 1000 | 100% | 44.0 | 64.4 | 1× |
+| DDIM | 100 | 100% | 32.4 | 2.0 | — |
+| DDIM | 50 | 100% | 32.4 | 2.0 | 16–19× |
+| DDIM | 20 | 100% | 30.9 | -5.0 | 37× |
+| DDIM | 10 | 100% | 28.7 | -18.2 | 75× |
 | real images | — | 100% | 22.4 | -32.2 | — |
 
-N = 100 samples per config. Speedups come from a sequential benchmark on one CPU thread (batch 10). DDIM 50 was timed before and after DDPM, and the 16–39× range reflects background load changing between the two runs; the step ratio is exactly 20×. At this sample size KID is within noise for every w = 2 config (the real-image floor itself is -32), so FID and class accuracy carry the comparison.
+N = 100 samples per config. Speedups come from a sequential benchmark on one CPU thread (batch 10); DDIM 50 was timed before and after DDPM to bracket changes in background load, and the step ratio is exactly 20×. With N = 100, differences of a few FID points are within noise; the gap to DDPM is larger, and KID agrees with it.
 
-Same starting noise, same label, different samplers. Deterministic DDIM (η = 0) gives nearly the same image at every step count. At this training stage DDIM samples show faint background speckle that DDPM's stochastic steps smooth away, even though the metrics are similar:
+Same starting noise, same label, different samplers. Deterministic DDIM (η = 0) gives nearly the same image at every step count; DDPM's stochastic steps take a different path and, at this guidance weight, produce visibly thinner strokes:
 
 ![sampler comparison](results/mnist_sampler_comparison.png)
 
 ![steps trade-off](results/mnist_steps_tradeoff.png)
 
-**Classifier-free guidance trades diversity for fidelity.** Raising w from 1 (plain conditional) to 2 lifts class accuracy from 75% to 98% and cuts FID from 96 to 26. Past that, samples stay on-class but FID worsens (41 at w = 3, 88 at w = 5) as strokes thicken and variety collapses. w = 0 is the unconditional model (11% accuracy, i.e. chance), which saw only 10% of training batches:
+**Classifier-free guidance trades diversity for fidelity.** w = 1 (the plain conditional model) gives the best FID (26.7) at 90% class accuracy; w = 2 reaches 100% accuracy at FID 32.4; past that, samples stay on-class but FID climbs as strokes thicken and variety collapses. w = 0 is the unconditional model (near-chance accuracy), which saw only 10% of training batches:
 
 | guidance w (DDIM 50) | class acc ↑ | FID ↓ |
 |---|---|---|
-| 0 | 11% | 226.6 |
-| 1 | 75% | 96.2 |
-| 2 | 98% | 26.1 |
-| 3 | 100% | 41.0 |
-| 5 | 100% | 87.9 |
+| 0 | 14% | 107.6 |
+| 1 | 90% | 26.7 |
+| 2 | 100% | 32.4 |
+| 3 | 100% | 56.4 |
+| 5 | 100% | 88.8 |
+
+Longer training shifted this trade-off: after 1,812 steps the plain conditional model reached only 75% accuracy (FID 96) and needed w = 2 to look right; after 15,351 steps it reaches 90% (FID 27), so the FID-optimal guidance weight dropped from 2 to 1.
 
 ![guidance comparison](results/mnist_guidance_comparison.png)
 
-Denoising trajectory (DDIM 50, x_t from pure noise to the final sample) and the training loss of the 0.42M-parameter UNet (1,812 steps at global batch 130, about 4 epochs, 60 minutes on a shared laptop CPU):
+Denoising trajectory (DDIM 50, x_t from pure noise to the final sample) and the training loss of the 0.42M-parameter UNet (15,351 steps, about 16 epochs, 3 hours in total on a shared laptop CPU):
 
 ![denoising](results/mnist_denoising.png)
 
 ![loss](results/mnist_loss.png)
-
 
 ## What's implemented
 
@@ -60,6 +66,7 @@ Denoising trajectory (DDIM 50, x_t from pure noise to the final sample) and the 
 | Classifier-free guidance | [`ddpm/sampling.py`](ddpm/sampling.py) | conditional and null-label passes batched into one forward call |
 | Evaluation | [`ddpm/evaluate.py`](ddpm/evaluate.py), [`ddpm/classifier.py`](ddpm/classifier.py), [`ddpm/metrics.py`](ddpm/metrics.py) | class accuracy, FID and KID in a dataset-specific classifier's feature space, wall-clock timing |
 | 2D toy experiments | [`ddpm/toy.py`](ddpm/toy.py) | 8 Gaussians, two moons, spiral with an MLP denoiser |
+| Interactive demo | [`web/`](web), [`ddpm/export_web.py`](ddpm/export_web.py), [`ddpm/serve.py`](ddpm/serve.py) | one vanilla-JS page: precomputed samples on GitHub Pages, live sampling through a local FastAPI server ([design](design/frontend.md)) |
 
 [`NOTES.md`](NOTES.md) walks through the math (forward process, ε-prediction, DDIM's non-Markovian reverse process, why CFG works) and maps each equation to the code.
 
@@ -91,6 +98,8 @@ make test                       # sampler math, schedule, CFG, UNet, metrics
 make toy                        # 2D experiments (~5 min)
 make train MINUTES=60           # MNIST, data-parallel over single-threaded CPU workers
 make eval N=100                 # samples for every sampler config -> metrics, figures, timing
+make web                        # regenerate the static demo in docs/ (GitHub Pages)
+make serve                      # local demo with live sampling at http://127.0.0.1:8000
 ```
 
 Variables: `DATASET=mnist|fashion`, `WORKERS`, `MINUTES`, `N`, `JOBS`; `make resume` continues from the last checkpoint. Long jobs run under `nice` with `OMP_NUM_THREADS=1`: on a contended CPU, single-threaded DDP workers sync once per step and scale far better than intra-op threads.
@@ -105,7 +114,7 @@ for i in 0 1 2 3; do uv run python -m ddpm.evaluate generate --method ddpm --n 1
 
 - [x] DDPM, DDIM, classifier-free guidance, UNet, CPU data-parallel training
 - [x] 2D toy experiments and MNIST evaluation (class accuracy, FID/KID, guidance sweep, timing)
-- [ ] Longer MNIST training run (current model saw ~4 epochs in 60 minutes)
+- [x] Longer MNIST training run (15,351 steps, about 16 epochs)
 - [ ] FashionMNIST model and evaluation
 - [ ] Larger evaluation (N = 1000 per config) for tighter FID/KID estimates
 - [ ] Ablations: cosine vs linear schedule; DDIM η ∈ {0, 0.5, 1}
