@@ -9,7 +9,7 @@ JOBS    ?= 2
 
 export OMP_NUM_THREADS = 1
 
-.PHONY: test lint toy train resume eval web
+.PHONY: test lint toy train resume eval web serve
 
 test:
 	uv run pytest -q
@@ -35,3 +35,6 @@ eval:
 
 web:
 	nice -n 10 uv run python -m ddpm.export_web
+
+serve:
+	uv run python -m ddpm.serve

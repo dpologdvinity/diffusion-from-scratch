@@ -11,10 +11,15 @@ dependencies = [
     "scipy",
     "matplotlib",
     "tqdm",
+    "fastapi>=0.142.4",
+    "uvicorn>=0.54.0",
 ]
 
 [dependency-groups]
-dev = ["pytest"]
+dev = [
+    "httpx2>=2.13.1",
+    "pytest",
+]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }

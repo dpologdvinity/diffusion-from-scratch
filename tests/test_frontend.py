@@ -91,3 +91,87 @@ def test_export_writes_consistent_manifest(model, tmp_path):
         assert not rel.startswith("/")
         assert Image.open(out / rel).size == (280, 28)
     assert manifest["model"] == {"train_steps": 1, "params": 2}
+
+
+# --- local server -----------------------------------------------------------------------
+
+
+@pytest.fixture()
+def client(model, tmp_path):
+    from fastapi.testclient import TestClient
+
+    from ddpm.serve import create_app
+
+    web_dir = tmp_path / "web"
+    web_dir.mkdir()
+    (web_dir / "index.html").write_text("<!doctype html><title>demo</title>")
+    assets = tmp_path / "docs"
+    assets.mkdir()
+    (assets / "manifest.json").write_text('{"grid": {}}')
+    app = create_app(model, NoiseSchedule(50), web_dir, assets, {"train_steps": 3, "params": 4})
+    return TestClient(app)
+
+
+def test_health_reports_model(client):
+    r = client.get("/api/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok", "model": {"train_steps": 3, "params": 4}}
+
+
+def test_sample_returns_frames(client):
+    r = client.post("/api/sample", json={"digit": 4, "steps": 5, "frames": 4})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["image"].startswith("data:image/png;base64,")
+    assert len(body["frames"]) == 4
+    assert all(f.startswith("data:image/png;base64,") for f in body["frames"])
+
+
+@pytest.mark.parametrize("payload", [{"digit": 10}, {"steps": 0}, {"sampler": "x"}, {"frames": 1}, {"eta": 2}])
+def test_invalid_requests_rejected(client, payload):
+    assert client.post("/api/sample", json=payload).status_code == 422
+
+
+def test_ddpm_ignores_steps(client):
+    r = client.post("/api/sample", json={"sampler": "ddpm", "steps": 5, "frames": 3})
+    assert r.status_code == 200
+    assert len(r.json()["frames"]) == 3
+
+
+def test_requests_are_serialized(client, monkeypatch):
+    import threading
+    import time
+
+    import ddpm.serve as serve
+
+    active, peak = [0], [0]
+    real = serve.sample_frames
+
+    def slow(*args, **kwargs):
+        active[0] += 1
+        peak[0] = max(peak[0], active[0])
+        time.sleep(0.2)
+        active[0] -= 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(serve, "sample_frames", slow)
+    threads = [threading.Thread(target=client.post, args=("/api/sample",), kwargs={"json": {"steps": 2, "frames": 2}})
+               for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert peak[0] == 1
+
+
+def test_missing_checkpoint_message():
+    from ddpm.serve import main
+
+    with pytest.raises(SystemExit, match="make train"):
+        main(["--ckpt", "does-not-exist.pt"])
+
+
+def test_serves_page_and_manifest(client):
+    assert client.get("/").status_code == 200
+    assert "demo" in client.get("/").text
+    assert client.get("/manifest.json").json() == {"grid": {}}
