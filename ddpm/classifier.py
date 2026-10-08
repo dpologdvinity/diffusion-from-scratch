@@ -78,6 +78,9 @@ def train(dataset: str, epochs: int = 4, batch: int = 128, seed: int = 0) -> tup
 
 def load_or_train(dataset: str, ckpt_dir: Path = Path("checkpoints")) -> SmallCNN:
     path = ckpt_dir / f"classifier_{dataset}.pt"
+    bundled = Path(__file__).resolve().parent.parent / "models" / f"classifier_{dataset}.pt"
+    if not path.exists() and bundled.exists():
+        path = bundled  # the committed classifier, so every machine scores samples identically
     model = SmallCNN()
     if path.exists():
         model.load_state_dict(torch.load(path, map_location="cpu")["model"])

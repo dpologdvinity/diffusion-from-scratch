@@ -196,3 +196,23 @@ def test_results_dir_flag_redirects_all_outputs(tmp_path, monkeypatch):
     ev.main()
     assert seen["results"] == tmp_path / "cosine"
     assert seen["runs"] == tmp_path / "cosine" / "runs" / "mnist"
+
+
+# --- device handling ------------------------------------------------------------------------
+
+
+def test_resolve_device():
+    from ddpm.train import resolve_device
+
+    assert resolve_device("cpu") == torch.device("cpu")
+    assert resolve_device("auto") == torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def test_sampling_noise_comes_from_the_cpu_generator(sched):
+    # GPU runs must start from the same noise as CPU runs, so noise is drawn on the CPU generator.
+    x0 = torch.tensor([[0.3, -0.7]])
+    model = OracleModel(sched, x0)
+    a = sample(model, sched, (2, 2), method="ddim", steps=5, eta=1.0, clip=False, generator=torch.Generator().manual_seed(4),
+               device="cpu", return_trajectory=True)[1][0]
+    b = torch.randn((2, 2), generator=torch.Generator().manual_seed(4))
+    torch.testing.assert_close(a, b)

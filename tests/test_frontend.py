@@ -285,3 +285,11 @@ def test_export_missing_checkpoint_message():
 
     with pytest.raises(SystemExit, match="make train"):
         main(["--ckpt", "does-not-exist.pt"])
+
+
+def test_classifier_falls_back_to_bundled_weights(tmp_path, monkeypatch):
+    import ddpm.classifier as clf
+
+    monkeypatch.setattr(clf, "train", lambda dataset: (_ for _ in ()).throw(AssertionError("must not retrain")))
+    model = clf.load_or_train("mnist", ckpt_dir=tmp_path)  # empty dir -> bundled models/classifier_mnist.pt
+    assert isinstance(model, clf.SmallCNN)

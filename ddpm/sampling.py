@@ -102,21 +102,29 @@ def sample(
     clip: bool = True,
     generator: torch.Generator | None = None,
     return_trajectory: bool = False,
+    device: torch.device | str | None = None,
 ):
     """Generate samples starting from pure noise x_T ~ N(0, I).
 
     method="ddpm" runs all T ancestral steps (steps/eta are ignored).
     method="ddim" runs `steps` steps on an evenly spaced timestep subsequence.
+
+    Noise is always drawn from the (CPU) generator and then moved to `device` (default: the
+    model's device), so a GPU run starts from exactly the same noise as a CPU run.
     """
+    if device is None:
+        device = next((p.device for p in model.parameters()), torch.device("cpu"))
     null_label = getattr(model, "num_classes", 0)
-    x = torch.randn(shape, generator=generator)
+    x = torch.randn(shape, generator=generator).to(device)
     traj = [x]
+    if y is not None:
+        y = y.to(device)
 
     def randn_like(x):
-        return torch.randn(x.shape, generator=generator)
+        return torch.randn(x.shape, generator=generator).to(device)
 
     def batch_t(v):
-        return torch.full((shape[0],), v, dtype=torch.long)
+        return torch.full((shape[0],), v, dtype=torch.long, device=device)
 
     if method == "ddpm":
         for t in range(sched.T - 1, -1, -1):

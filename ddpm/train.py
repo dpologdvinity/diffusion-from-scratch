@@ -66,6 +66,13 @@ def export_ema(src: str | Path, dst: str | Path):
     torch.save({k: ckpt[k] for k in ("ema", "unet_config", "schedule", "step")}, dst)
 
 
+def resolve_device(name: str) -> torch.device:
+    """'auto' picks CUDA when available, otherwise CPU."""
+    if name == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return torch.device(name)
+
+
 @torch.no_grad()
 def update_ema(ema, model, decay: float):
     for pe, pm in zip(ema.parameters(), model.parameters()):
@@ -99,6 +106,7 @@ def main():
     p.add_argument("--num-res-blocks", type=int, default=1)
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--threads", type=int, default=0, help="torch CPU threads per worker (0 = default)")
+    p.add_argument("--device", default="cpu", help="cpu, cuda, or auto (single-process only for GPUs)")
     p.add_argument("--log-every", type=int, default=100)
     p.add_argument("--ckpt-every", type=int, default=1000)
     p.add_argument("--preview-every", type=int, default=500)
@@ -116,14 +124,16 @@ def main():
         torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)  # identical init on every worker (DDP also broadcasts rank 0's weights)
 
+    device = resolve_device(args.device)
     x_all, y_all = data.load(args.dataset, train=True)
+    x_all, y_all = x_all.to(device), y_all.to(device)
     num_classes = int(y_all.max()) + 1
     sched = NoiseSchedule(args.T, args.schedule)
 
     model = UNet(
         base_ch=args.base_ch, ch_mults=tuple(args.ch_mults), num_res_blocks=args.num_res_blocks,
         num_classes=num_classes, dropout=args.dropout,
-    )
+    ).to(device)
     ema = copy.deepcopy(model).requires_grad_(False)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.0)
 
@@ -147,7 +157,7 @@ def main():
     if main_proc:
         print(
             f"{args.dataset}: {len(x_all)} images, {num_classes} classes, UNet {n_params / 1e6:.2f}M params, "
-            f"{world} worker(s) x {torch.get_num_threads()} thread(s), global batch {args.batch_size * world}",
+            f"{world} worker(s) x {torch.get_num_threads()} thread(s) on {device}, global batch {args.batch_size * world}",
             flush=True,
         )
 
@@ -162,11 +172,11 @@ def main():
     t0, running, start_step = time.monotonic(), 0.0, step
     deadline = t0 + args.minutes * 60 if args.minutes else float("inf")
     while not should_stop():
-        idx = torch.randint(0, len(x_all), (args.batch_size,))
+        idx = torch.randint(0, len(x_all), (args.batch_size,), device=device)
         x0, y = x_all[idx], y_all[idx]
-        y = torch.where(torch.rand(y.shape) < args.p_uncond, torch.full_like(y, num_classes), y)
+        y = torch.where(torch.rand(y.shape, device=device) < args.p_uncond, torch.full_like(y, num_classes), y)
 
-        t = torch.randint(0, sched.T, (args.batch_size,))
+        t = torch.randint(0, sched.T, (args.batch_size,), device=device)
         noise = torch.randn_like(x0)
         loss = F.mse_loss(net(sched.q_sample(x0, t, noise), t, y), noise)
 

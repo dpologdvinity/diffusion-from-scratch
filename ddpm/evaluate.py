@@ -29,7 +29,7 @@ from . import data
 from .classifier import load_or_train, predict
 from .metrics import frechet_distance, kernel_distance
 from .sampling import sample
-from .train import load_ema_model
+from .train import load_ema_model, resolve_device
 
 RESULTS = Path("results")
 
@@ -61,6 +61,7 @@ def load_runs(dataset: str) -> dict[str, dict]:
 
 def cmd_generate(args):
     model, sched, _ = load_ema_model(Path(args.ckpt_dir) / f"{args.dataset}.pt")
+    model.to(resolve_device(args.device))
     steps = sched.T if args.method == "ddpm" else args.steps
     name = run_name(args.method, steps, args.guidance, args.eta)
     y_all = balanced_labels(args.n)
@@ -73,7 +74,7 @@ def cmd_generate(args):
         g = torch.Generator().manual_seed(args.seed + i)
         t0 = time.perf_counter()
         xs.append(sample(model, sched, (len(y), 1, 28, 28), y, method=args.method, steps=steps, eta=args.eta,
-                         guidance=args.guidance, generator=g))
+                         guidance=args.guidance, generator=g).cpu())
         ys.append(y)
         secs += time.perf_counter() - t0
         print(f"  {args.dataset} {name}: batch at {i} done ({secs:.0f}s)", flush=True)
@@ -233,7 +234,7 @@ def cmd_figures(args):
     frames = torch.stack([traj[i] for i in picks], dim=1).flatten(0, 1)  # (10 * len(picks), 1, 28, 28)
     save_image(data.to_unit(frames), RESULTS / f"{args.dataset}_denoising.png", nrow=len(picks), padding=1)
 
-    hist = ckpt["history"]
+    hist = ckpt.get("history")  # inference-only checkpoints (models/*.pt) have no history
     if hist:
         fig, ax = plt.subplots(figsize=(5, 3))
         ax.plot([h["step"] for h in hist], [h["loss"] for h in hist])
@@ -287,6 +288,7 @@ def main():
             s.add_argument("--eta", type=float, default=0.0, help="DDIM stochasticity (0 = deterministic, 1 = DDPM-like)")
             s.add_argument("--shard", type=int, default=0, help="which shard of the batches to generate")
             s.add_argument("--num-shards", type=int, default=1, help="split generation across this many processes")
+            s.add_argument("--device", default="cpu", help="cpu, cuda, or auto")
         if name == "timing":
             s.add_argument("--batch", type=int, default=20)
     args = p.parse_args()
