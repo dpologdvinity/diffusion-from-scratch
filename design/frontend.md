@@ -38,7 +38,7 @@ Size target: well under 1 MB total (28×28 grayscale PNGs compress to a few hund
 
 ## Live API
 
-- `GET /api/health` → `{"status": "ok", "model": {"steps": int, "params": int}}`
+- `GET /api/health` → `{"status": "ok", "model": {"train_steps": int, "params": int}}`
 - `POST /api/sample` with JSON `{digit: 0–9, guidance: 0–10, sampler: "ddim" | "ddpm", steps: 1–1000 (DDIM only), eta: 0–1, seed: 0–2^31-1, frames: 2–50}` → `{"image": <PNG data URL>, "frames": [<PNG data URL>, ...], "seconds": float}`
 - Validation via Pydantic models; out-of-range values return 422 with field errors, which the UI shows inline.
 - A lock serializes sampling so concurrent requests queue instead of multiplying CPU use.
