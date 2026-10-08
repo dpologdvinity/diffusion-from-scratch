@@ -15,8 +15,14 @@ W=2  # guidance weight for the step-count sweep
 export OMP_NUM_THREADS=1
 run() { nice -n 10 uv run python -m ddpm.evaluate "$@"; }
 
-configs=(
-  "--method ddpm --steps 1000 --guidance $W"
+# DDPM (1000 steps) dominates the cost, so it is split into $JOBS shards that run in parallel;
+# shards reproduce the unsharded samples exactly and are merged by `report`.
+SHARD_BATCH=$(( (N + JOBS - 1) / JOBS ))
+configs=()
+for i in $(seq 0 $((JOBS - 1))); do
+  configs+=("--method ddpm --steps 1000 --guidance $W --batch $SHARD_BATCH --shard $i --num-shards $JOBS")
+done
+configs+=(
   "--method ddim --steps 100 --guidance $W"
   "--method ddim --steps 50 --guidance $W"
   "--method ddim --steps 20 --guidance $W"
@@ -31,7 +37,7 @@ mkdir -p results/runs/"$DATASET"
 for cfg in "${configs[@]}"; do
   while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n; done
   # shellcheck disable=SC2086
-  run generate --dataset "$DATASET" --n "$N" --batch "$N" $cfg > /dev/null &
+  run generate --dataset "$DATASET" --n "$N" --batch "$N" $cfg > /dev/null &  # later --batch wins
 done
 wait
 
