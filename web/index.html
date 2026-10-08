@@ -4,15 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Diffusion from scratch: interactive demo</title>
-  <meta name="description" content="Class-conditional DDPM with classifier-free guidance and DDIM sampling, trained on MNIST. Explore guidance and sampler steps.">
+  <meta name="description" content="Class-conditional DDPM with classifier-free guidance and DDIM sampling, trained on MNIST and FashionMNIST. Explore guidance and sampler steps.">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main>
     <header>
       <h1>Diffusion from scratch</h1>
-      <p>A class-conditional diffusion model trained on MNIST, written from PyTorch primitives.
-        Each row shows the digits 0–9 generated from the <em>same starting noise</em>, so every change you see comes from the setting you move.</p>
+      <p>A class-conditional diffusion model written from PyTorch primitives, trained on MNIST digits and FashionMNIST clothing.
+        Each row shows one sample of every class, all generated from the <em>same starting noise</em>, so every change you see comes from the setting you move.</p>
+      <div id="dataset-control" class="control dataset-control">
+        <label for="dataset">Dataset</label>
+        <select id="dataset">
+          <option value="mnist">MNIST digits</option>
+          <option value="fashion">FashionMNIST clothing</option>
+        </select>
+      </div>
       <p id="status" class="status" role="status">Loading samples…</p>
     </header>
 
@@ -22,7 +29,7 @@
         <div class="control">
           <label for="guidance">Guidance weight <output id="guidance-value" for="guidance"></output></label>
           <input id="guidance" type="range" min="0" max="4" step="1" value="2">
-          <p class="hint">0 = unconditional, 1 = plain conditional, higher = stronger pull toward the requested digit.</p>
+          <p class="hint">0 = unconditional, 1 = plain conditional, higher = stronger pull toward the requested class.</p>
         </div>
         <div class="control">
           <label for="steps">Sampler <output id="steps-value" for="steps"></output></label>
@@ -41,8 +48,8 @@
       <p>Running against the local model. Every option is free-form here.</p>
       <form id="live-form" class="controls">
         <div class="control">
-          <label for="live-digit">Digit</label>
-          <input id="live-digit" type="number" min="0" max="9" value="7" required>
+          <label for="live-label">Class</label>
+          <select id="live-label"></select>
         </div>
         <div class="control">
           <label for="live-guidance">Guidance <output id="live-guidance-value" for="live-guidance">2</output></label>

@@ -41,11 +41,12 @@ eval:
 	scripts/run_eval.sh $(DATASET) $(N) $(JOBS)
 
 web:
-	nice -n 10 uv run python -m ddpm.export_web
+	nice -n 10 uv run python -m ddpm.export_web --dataset mnist
+	nice -n 10 uv run python -m ddpm.export_web --dataset fashion
 
 serve:
 	uv run python -m ddpm.serve
 
 # Refresh the small inference-only weights committed for clone-and-serve.
 weights:
-	uv run python -c "from ddpm.train import export_ema; export_ema('checkpoints/mnist.pt', 'models/mnist.pt')"
+	uv run python -c "from ddpm.train import export_ema; [export_ema(f'checkpoints/{d}.pt', f'models/{d}.pt') for d in ('mnist', 'fashion')]"

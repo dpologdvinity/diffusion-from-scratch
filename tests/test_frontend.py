@@ -81,8 +81,9 @@ def test_export_writes_consistent_manifest(model, tmp_path):
     web_dir.mkdir()
     (web_dir / "index.html").write_text("<!doctype html>")
     out = tmp_path / "docs"
+    labels = [f"class {i}" for i in range(10)]
     manifest = export(model, NoiseSchedule(50), out, web_dir, guidances=(0, 2), steps=(5,), traj_frames=3,
-                      model_info={"train_steps": 1, "params": 2})
+                      model_info={"train_steps": 1, "params": 2}, labels=labels)
 
     assert (out / "index.html").exists()
     assert json.loads((out / "manifest.json").read_text()) == manifest
@@ -93,6 +94,15 @@ def test_export_writes_consistent_manifest(model, tmp_path):
         assert not rel.startswith("/")
         assert Image.open(out / rel).size == (280, 28)
     assert manifest["model"] == {"train_steps": 1, "params": 2}
+    assert manifest["labels"] == labels
+
+
+def test_export_without_web_dir_writes_only_assets(model, tmp_path):
+    from ddpm.export_web import export
+
+    out = tmp_path / "docs" / "fashion"
+    export(model, NoiseSchedule(50), out, None, guidances=(2,), steps=(5,), traj_frames=2, labels=list("abcdefghij"))
+    assert (out / "manifest.json").exists() and not (out / "index.html").exists()
 
 
 # --- local server -----------------------------------------------------------------------
@@ -110,18 +120,22 @@ def client(model, tmp_path):
     assets = tmp_path / "docs"
     assets.mkdir()
     (assets / "manifest.json").write_text('{"grid": {}}')
-    app = create_app(model, NoiseSchedule(50), web_dir, assets, {"train_steps": 3, "params": 4})
-    return TestClient(app)
+    (assets / "fashion").mkdir()
+    (assets / "fashion" / "manifest.json").write_text('{"grid": {"f": 1}}')
+    models = {"mnist": (model, NoiseSchedule(50), {"train_steps": 3, "params": 4}),
+              "fashion": (model, NoiseSchedule(50), {"train_steps": 5, "params": 4})}
+    return TestClient(create_app(models, web_dir, assets))
 
 
 def test_health_reports_model(client):
     r = client.get("/api/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "model": {"train_steps": 3, "params": 4}}
+    assert r.json() == {"status": "ok", "datasets": {"mnist": {"train_steps": 3, "params": 4},
+                                                     "fashion": {"train_steps": 5, "params": 4}}}
 
 
 def test_sample_returns_frames(client):
-    r = client.post("/api/sample", json={"digit": 4, "steps": 5, "frames": 4})
+    r = client.post("/api/sample", json={"dataset": "fashion", "label": 4, "steps": 5, "frames": 4})
     assert r.status_code == 200
     body = r.json()
     assert body["image"].startswith("data:image/png;base64,")
@@ -129,9 +143,22 @@ def test_sample_returns_frames(client):
     assert all(f.startswith("data:image/png;base64,") for f in body["frames"])
 
 
-@pytest.mark.parametrize("payload", [{"digit": 10}, {"steps": 0}, {"sampler": "x"}, {"frames": 1}, {"eta": 2}])
+@pytest.mark.parametrize("payload", [{"label": 10}, {"steps": 0}, {"sampler": "x"}, {"frames": 1}, {"eta": 2},
+                                     {"dataset": "cifar"}])
 def test_invalid_requests_rejected(client, payload):
     assert client.post("/api/sample", json=payload).status_code == 422
+
+
+def test_dataset_without_weights_is_rejected(model, tmp_path):
+    from fastapi.testclient import TestClient
+
+    from ddpm.serve import create_app
+
+    (tmp_path / "index.html").write_text("x")
+    client = TestClient(create_app({"mnist": (model, NoiseSchedule(50), {})}, tmp_path, None))
+    r = client.post("/api/sample", json={"dataset": "fashion"})
+    assert r.status_code == 422
+    assert r.json()["detail"][0]["loc"][-1] == "dataset"
 
 
 def test_ddpm_ignores_steps(client):
@@ -177,6 +204,7 @@ def test_serves_page_and_manifest(client):
     assert client.get("/").status_code == 200
     assert "demo" in client.get("/").text
     assert client.get("/manifest.json").json() == {"grid": {}}
+    assert client.get("/fashion/manifest.json").json() == {"grid": {"f": 1}}
 
 
 # --- web page ---------------------------------------------------------------------------
@@ -194,7 +222,7 @@ def test_page_uses_relative_urls():
 
 def test_page_has_required_controls():
     html = (WEB / "index.html").read_text()
-    for el_id in ("static-view", "guidance", "steps", "digits", "play", "live-view", "status"):
+    for el_id in ("dataset", "static-view", "guidance", "steps", "digits", "play", "live-view", "live-label", "status"):
         assert f'id="{el_id}"' in html, el_id
     for input_id in re.findall(r'<input[^>]*\bid="([^"]+)"', html):
         assert f'for="{input_id}"' in html, f"input #{input_id} has no label"
@@ -235,17 +263,18 @@ def test_default_checkpoint_prefers_trained_then_bundled(tmp_path):
     from ddpm.serve import default_checkpoint
 
     (tmp_path / "models").mkdir()
-    (tmp_path / "models" / "mnist.pt").write_bytes(b"x")
-    assert default_checkpoint(tmp_path) == tmp_path / "models" / "mnist.pt"
+    (tmp_path / "models" / "fashion.pt").write_bytes(b"x")
+    assert default_checkpoint(tmp_path, "fashion") == tmp_path / "models" / "fashion.pt"
     (tmp_path / "checkpoints").mkdir()
-    (tmp_path / "checkpoints" / "mnist.pt").write_bytes(b"x")
-    assert default_checkpoint(tmp_path) == tmp_path / "checkpoints" / "mnist.pt"
+    (tmp_path / "checkpoints" / "fashion.pt").write_bytes(b"x")
+    assert default_checkpoint(tmp_path, "fashion") == tmp_path / "checkpoints" / "fashion.pt"
 
 
-def test_bundled_weights_ship_with_the_repo():
+@pytest.mark.parametrize("dataset", ["mnist", "fashion"])
+def test_bundled_weights_ship_with_the_repo(dataset):
     from ddpm.train import load_ema_model
 
-    path = Path(__file__).resolve().parent.parent / "models" / "mnist.pt"
+    path = Path(__file__).resolve().parent.parent / "models" / f"{dataset}.pt"
     model, sched, ckpt = load_ema_model(path)
     assert sum(p.numel() for p in model.parameters()) == 424465
     assert ckpt["step"] > 0 and path.stat().st_size < 3_000_000

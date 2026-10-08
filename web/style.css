@@ -42,6 +42,7 @@ a { color: var(--accent); }
 code { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 0.9em; }
 
 .status { color: var(--muted); font-size: 0.9rem; }
+.dataset-control { max-width: 16rem; margin-top: 1rem; }
 .hint { color: var(--muted); font-size: 0.85rem; margin: 0.25rem 0 0; }
 .error { color: var(--error); min-height: 1.5em; }
 

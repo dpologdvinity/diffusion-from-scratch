@@ -13,20 +13,25 @@ from pathlib import Path
 
 import torch
 
+from . import data
 from .render import png_row, sample_frames
 from .train import load_ema_model
 
 DIGITS = torch.arange(10)
 
 
-def export(model, sched, out_dir: Path, web_dir: Path, guidances=(0, 1, 2, 3, 5), steps=(10, 20, 50, 100),
+def export(model, sched, out_dir: Path, web_dir: Path | None, guidances=(0, 1, 2, 3, 5), steps=(10, 20, 50, 100),
            traj_frames: int = 11, traj_guidance: float = 2.0, traj_steps: int = 50, ddpm_guidance: float = 2.0,
-           seed: int = 0, model_info: dict | None = None) -> dict:
-    """Copy the page into out_dir, write sprite rows (10 digits, 280x28 each), and return the manifest."""
+           seed: int = 0, model_info: dict | None = None, labels: list[str] | None = None) -> dict:
+    """Write sprite rows (one image per class, 280x28 each) and the manifest into out_dir.
+
+    web_dir, if given, is copied in too (the page lives at the site root, next to the MNIST assets).
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
-    for f in web_dir.iterdir():
-        if f.is_file():
-            shutil.copy(f, out_dir / f.name)
+    if web_dir is not None:
+        for f in web_dir.iterdir():
+            if f.is_file():
+                shutil.copy(f, out_dir / f.name)
     sprite_dir = out_dir / "sprites"
     sprite_dir.mkdir(exist_ok=True)
 
@@ -53,6 +58,7 @@ def export(model, sched, out_dir: Path, web_dir: Path, guidances=(0, 1, 2, 3, 5)
 
     manifest = {
         "model": model_info or {},
+        "labels": labels or [str(d) for d in DIGITS.tolist()],
         "digits": DIGITS.tolist(),
         "guidance": list(guidances),
         "steps": list(steps),
@@ -66,17 +72,22 @@ def export(model, sched, out_dir: Path, web_dir: Path, guidances=(0, 1, 2, 3, 5)
 
 def main(argv: list[str] | None = None):
     p = argparse.ArgumentParser()
-    p.add_argument("--ckpt", default="checkpoints/mnist.pt")
-    p.add_argument("--out", type=Path, default=Path("docs"))
+    p.add_argument("--dataset", choices=list(data.DATASETS), default="mnist")
+    p.add_argument("--ckpt", default=None, help="default: checkpoints/<dataset>.pt")
+    p.add_argument("--out", type=Path, default=None, help="default: docs/ for mnist, docs/<dataset>/ otherwise")
     p.add_argument("--web", type=Path, default=Path("web"))
     p.add_argument("--threads", type=int, default=1)
     args = p.parse_args(argv)
+    args.ckpt = args.ckpt or f"checkpoints/{args.dataset}.pt"
+    args.out = args.out or (Path("docs") if args.dataset == "mnist" else Path("docs") / args.dataset)
     if not Path(args.ckpt).exists():
         raise SystemExit(f"checkpoint not found: {args.ckpt}. Train one with `make train` first.")
     torch.set_num_threads(args.threads)
     model, sched, ckpt = load_ema_model(args.ckpt)
     info = {"train_steps": ckpt["step"], "params": sum(p.numel() for p in model.parameters())}
-    export(model, sched, args.out, args.web, model_info=info)
+    # The page itself is copied only with the root (MNIST) assets.
+    export(model, sched, args.out, args.web if args.dataset == "mnist" else None, model_info=info,
+           labels=data.CLASS_NAMES[args.dataset])
     print(f"wrote {args.out}/")
 
 

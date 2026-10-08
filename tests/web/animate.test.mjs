@@ -47,7 +47,7 @@ test("a newer animation on the same image cancels the older one", () => {
 
 test("a DDPM request leaves out the disabled DDIM-only fields", () => {
   const { sandbox } = load();
-  const values = { digit: "3", guidance: "2", sampler: "ddpm", steps: "", eta: "0.5", seed: "4" };
+  const values = { dataset: "mnist", label: "3", guidance: "2", sampler: "ddpm", steps: "", eta: "0.5", seed: "4" };
   const req = sandbox.buildRequest(values);
   assert.equal(req.sampler, "ddpm");
   assert.equal("steps" in req, false);
@@ -83,4 +83,21 @@ test("while the trajectory plays, the labels describe the trajectory setting", (
   run("render(); play()");
   assert.equal(get("guidance-value").textContent, "2 (during playback)");
   assert.equal(get("steps-value").textContent, "DDIM, 50 steps (during playback)");
+});
+
+test("a dataset's manifest paths are resolved under its folder", () => {
+  const { sandbox } = load();
+  const m = sandbox.withBase(JSON.parse(JSON.stringify(MANIFEST)), "fashion/");
+  assert.equal(m.grid.w2_s50, "fashion/g2s50.png");
+  assert.equal(m.ddpm.sprite, "fashion/ddpm.png");
+  assert.deepEqual(m.trajectory.frames, ["fashion/t0.png", "fashion/t1.png"]);
+  assert.equal(sandbox.withBase(JSON.parse(JSON.stringify(MANIFEST)), "").grid.w0_s10, "g0s10.png");
+});
+
+test("live requests name the dataset and class", () => {
+  const { sandbox } = load();
+  const req = sandbox.buildRequest({ dataset: "fashion", label: "8", guidance: "1", sampler: "ddim", steps: "20", eta: "0", seed: "3" });
+  assert.equal(req.dataset, "fashion");
+  assert.equal(req.label, 8);
+  assert.equal("digit" in req, false);
 });
