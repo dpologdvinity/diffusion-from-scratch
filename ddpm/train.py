@@ -152,7 +152,7 @@ def main():
         return bool(stop.item())
 
     model.train()
-    t0, running = time.monotonic(), 0.0
+    t0, running, start_step = time.monotonic(), 0.0, step
     deadline = t0 + args.minutes * 60 if args.minutes else float("inf")
     while not should_stop():
         idx = torch.randint(0, len(x_all), (args.batch_size,))
@@ -183,7 +183,7 @@ def main():
             history.append(rec)
             with open(log_path, "a") as f:
                 f.write(json.dumps(rec) + "\n")
-            print(f"step {step:6d}  loss {rec['loss']:.4f}  {elapsed / 60:6.1f} min  {elapsed / step:.2f} s/step", flush=True)
+            print(f"step {step:6d}  loss {rec['loss']:.4f}  {elapsed / 60:6.1f} min  {elapsed / (step - start_step):.2f} s/step", flush=True)
             running = 0.0
         if step % args.ckpt_every == 0:
             save_checkpoint(ckpt_path, model, ema, opt, step, args, history)
