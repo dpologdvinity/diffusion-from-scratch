@@ -1,0 +1,75 @@
+{
+  "model": {
+    "train_steps": 15351,
+    "params": 424465
+  },
+  "digits": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "guidance": [
+    0,
+    1,
+    2,
+    3,
+    5
+  ],
+  "steps": [
+    10,
+    20,
+    50,
+    100
+  ],
+  "grid": {
+    "w0_s10": "sprites/ddim_w0_s10.png",
+    "w0_s20": "sprites/ddim_w0_s20.png",
+    "w0_s50": "sprites/ddim_w0_s50.png",
+    "w0_s100": "sprites/ddim_w0_s100.png",
+    "w1_s10": "sprites/ddim_w1_s10.png",
+    "w1_s20": "sprites/ddim_w1_s20.png",
+    "w1_s50": "sprites/ddim_w1_s50.png",
+    "w1_s100": "sprites/ddim_w1_s100.png",
+    "w2_s10": "sprites/ddim_w2_s10.png",
+    "w2_s20": "sprites/ddim_w2_s20.png",
+    "w2_s50": "sprites/ddim_w2_s50.png",
+    "w2_s100": "sprites/ddim_w2_s100.png",
+    "w3_s10": "sprites/ddim_w3_s10.png",
+    "w3_s20": "sprites/ddim_w3_s20.png",
+    "w3_s50": "sprites/ddim_w3_s50.png",
+    "w3_s100": "sprites/ddim_w3_s100.png",
+    "w5_s10": "sprites/ddim_w5_s10.png",
+    "w5_s20": "sprites/ddim_w5_s20.png",
+    "w5_s50": "sprites/ddim_w5_s50.png",
+    "w5_s100": "sprites/ddim_w5_s100.png"
+  },
+  "ddpm": {
+    "guidance": 2.0,
+    "steps": 1000,
+    "sprite": "sprites/ddpm_w2.png"
+  },
+  "trajectory": {
+    "guidance": 2.0,
+    "steps": 50,
+    "frames": [
+      "sprites/traj_00.png",
+      "sprites/traj_01.png",
+      "sprites/traj_02.png",
+      "sprites/traj_03.png",
+      "sprites/traj_04.png",
+      "sprites/traj_05.png",
+      "sprites/traj_06.png",
+      "sprites/traj_07.png",
+      "sprites/traj_08.png",
+      "sprites/traj_09.png",
+      "sprites/traj_10.png"
+    ]
+  }
+}

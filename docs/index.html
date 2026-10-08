@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diffusion from scratch: interactive demo</title>
+  <meta name="description" content="Class-conditional DDPM with classifier-free guidance and DDIM sampling, trained on MNIST. Explore guidance and sampler steps.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Diffusion from scratch</h1>
+      <p>A class-conditional diffusion model trained on MNIST, written from PyTorch primitives.
+        Each row shows the digits 0–9 generated from the <em>same starting noise</em>, so every change you see comes from the setting you move.</p>
+      <p id="status" class="status" role="status">Loading samples…</p>
+    </header>
+
+    <section id="static-view" aria-labelledby="static-heading">
+      <h2 id="static-heading">Guidance and sampler steps</h2>
+      <div class="controls">
+        <div class="control">
+          <label for="guidance">Guidance weight <output id="guidance-value" for="guidance"></output></label>
+          <input id="guidance" type="range" min="0" max="4" step="1" value="2">
+          <p class="hint">0 = unconditional, 1 = plain conditional, higher = stronger pull toward the requested digit.</p>
+        </div>
+        <div class="control">
+          <label for="steps">Sampler <output id="steps-value" for="steps"></output></label>
+          <input id="steps" type="range" min="0" max="4" step="1" value="2">
+          <p class="hint">DDIM can skip timesteps; DDPM takes all 1000 (shown at guidance 2).</p>
+        </div>
+      </div>
+      <div class="digits-frame">
+        <img id="digits" class="digits" alt="" width="560" height="56">
+      </div>
+      <button id="play" type="button">Watch it denoise</button>
+    </section>
+
+    <section id="live-view" aria-labelledby="live-heading" hidden>
+      <h2 id="live-heading">Live sampling</h2>
+      <p>Running against the local model. Every option is free-form here.</p>
+      <form id="live-form" class="controls">
+        <div class="control">
+          <label for="live-digit">Digit</label>
+          <input id="live-digit" type="number" min="0" max="9" value="7" required>
+        </div>
+        <div class="control">
+          <label for="live-guidance">Guidance <output id="live-guidance-value" for="live-guidance">2</output></label>
+          <input id="live-guidance" type="range" min="0" max="10" step="0.5" value="2">
+        </div>
+        <div class="control">
+          <label for="live-sampler">Sampler</label>
+          <select id="live-sampler">
+            <option value="ddim">DDIM</option>
+            <option value="ddpm">DDPM (1000 steps)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="live-steps">DDIM steps</label>
+          <input id="live-steps" type="number" min="1" max="1000" value="50" required>
+        </div>
+        <div class="control">
+          <label for="live-eta">η (DDIM noise) <output id="live-eta-value" for="live-eta">0</output></label>
+          <input id="live-eta" type="range" min="0" max="1" step="0.1" value="0">
+        </div>
+        <div class="control">
+          <label for="live-seed">Seed</label>
+          <input id="live-seed" type="number" min="0" max="2147483647" value="0" required>
+        </div>
+        <button type="submit">Generate</button>
+      </form>
+      <p id="live-error" class="error" role="alert"></p>
+      <div class="live-output" hidden>
+        <img id="live-image" class="live-image" alt="" width="168" height="168">
+        <p id="live-meta" class="hint"></p>
+      </div>
+    </section>
+
+    <footer>
+      <p><a href="https://github.com/dpologdvinity/diffusion-from-scratch">Source and write-up on GitHub</a>.
+        Run it locally with live sampling: clone the repo, then <code>make serve</code>.</p>
+    </footer>
+  </main>
+  <script src="app.js" defer></script>
+</body>
+</html>
