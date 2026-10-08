@@ -60,6 +60,8 @@ Song et al. observed that the training loss only depends on the marginals q(x_t 
 
 Intuition: DDPM injects fresh noise every step, so it needs many small steps to average out the errors. DDIM with η = 0 follows a smooth deterministic path, so it can take large steps.
 
+**Measured here (MNIST, N = 1,000, w = 2):** η, not the step count, explains most of the gap. At a fixed 50 steps, FID goes 19.0 (η = 0) → 22.6 (η = 0.5) → 30.1 (η = 1), close to DDPM 1000's 28.0. At 10 steps, η = 1 nearly doubles FID (36.4 vs 18.6): each large step injects noise that the few remaining steps cannot remove. FashionMNIST shows the same ordering. So DDIM's 50-step result is not "DDPM, but faster": it samples a different, deterministic path that happens to score better under this metric.
+
 ## 6. Classifier-free guidance (`guided_eps`)
 
 At each sampling step, run the network twice (batched into one call), with the real label and with the null label:
