@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/dpologdvinity/diffusion-from-scratch/actions/workflows/tests.yml/badge.svg)](https://github.com/dpologdvinity/diffusion-from-scratch/actions/workflows/tests.yml)
 
-A class-conditional **DDPM** with **classifier-free guidance** and **DDIM** sampling, written from scratch in PyTorch (no `diffusers` or other diffusion libraries) and trained entirely on a laptop CPU.
+A class-conditional **DDPM** with **classifier-free guidance** and **DDIM** sampling, written from scratch in PyTorch (no `diffusers` or other diffusion libraries) and trained entirely on a laptop CPU, on MNIST and FashionMNIST.
 
 ## Try it
 
@@ -65,6 +65,42 @@ Denoising trajectory (DDIM 50, x_t from pure noise to the final sample) and the 
 
 ![loss](results/mnist_loss.png)
 
+## Results (FashionMNIST)
+
+The same model and code trained on FashionMNIST (15,921 steps at batch 52, about 14 epochs, 2.5 hours on one CPU core). Each row is the requested class (T-shirt, trouser, pullover, dress, coat, sandal, shirt, sneaker, bag, boot):
+
+![FashionMNIST samples](results/fashion_samples.png)
+
+The MNIST findings hold on a harder, more varied dataset. At w = 2, DDIM 50 matches DDPM 1000 on class accuracy (92.0% vs 93.4%) with a lower FID (13.8 vs 24.3; real images score 2.3) at 19–21× the speed, and adding DDIM noise (η) again moves FID back toward DDPM's:
+
+| sampler (w = 2) | class acc ↑ | FID ↓ | wall-clock speedup |
+|---|---|---|---|
+| DDPM 1000 | 93.4% | 24.3 | 1× |
+| DDIM 100 | 91.8% | 13.2 | — |
+| DDIM 50 | 92.0% | 13.8 | 19–21× |
+| DDIM 20 | 92.4% | 14.4 | 47× |
+| DDIM 10 | 92.9% | 15.6 | 114× |
+| DDIM 50, η = 0.5 | 93.0% | 16.9 | — |
+| DDIM 50, η = 1 | 93.0% | 24.9 | — |
+| DDIM 10, η = 1 | 94.0% | 26.6 | — |
+| real images | 86.7% | 2.3 | — |
+
+N = 1,000 samples per config. The evaluation classifier is only 86.5% accurate on the test set (shirt, T-shirt, pullover, and coat are easily confused), so real images score about that; generated samples score *higher* because guidance pulls them toward unambiguous, prototypical examples of each class.
+
+![sampler comparison](results/fashion_sampler_comparison.png)
+
+Guidance behaves as on MNIST, but the plain conditional model (w = 1) is weaker here (78.4% accuracy), so w = 2 buys 14 points of accuracy for about 1 FID point before larger weights collapse variety:
+
+| guidance w (DDIM 50) | class acc ↑ | FID ↓ |
+|---|---|---|
+| 0 | 10.3% | 49.6 |
+| 1 | 78.4% | 12.9 |
+| 2 | 92.0% | 13.8 |
+| 3 | 93.9% | 37.1 |
+| 5 | 94.7% | 73.0 |
+
+![guidance comparison](results/fashion_guidance_comparison.png)
+
 ## What's implemented
 
 | Piece | Where | Notes |
@@ -126,7 +162,7 @@ for i in 0 1 2 3; do uv run python -m ddpm.evaluate generate --method ddpm --n 1
 - [x] DDPM, DDIM, classifier-free guidance, UNet, CPU data-parallel training
 - [x] 2D toy experiments and MNIST evaluation (class accuracy, FID/KID, guidance sweep, timing)
 - [x] Longer MNIST training run (15,351 steps, about 16 epochs)
-- [ ] FashionMNIST model and evaluation
+- [x] FashionMNIST model and evaluation
 - [x] Larger evaluation (N = 1,000 per config) for tighter FID/KID estimates
 - [x] DDIM η ablation (η ∈ {0, 0.5, 1})
 - [ ] Cosine vs linear noise schedule (needs a full retrain)
