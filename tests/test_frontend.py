@@ -1,5 +1,7 @@
 import io
 import json
+import re
+from pathlib import Path
 
 import pytest
 import torch
@@ -175,3 +177,24 @@ def test_serves_page_and_manifest(client):
     assert client.get("/").status_code == 200
     assert "demo" in client.get("/").text
     assert client.get("/manifest.json").json() == {"grid": {}}
+
+
+# --- web page ---------------------------------------------------------------------------
+
+WEB = Path(__file__).resolve().parent.parent / "web"
+
+
+def test_page_uses_relative_urls():
+    # GitHub Pages serves the site under /diffusion-from-scratch/, so absolute paths would break.
+    for f in ("index.html", "app.js", "style.css"):
+        text = (WEB / f).read_text()
+        for absolute in ('src="/', "href=\"/", 'fetch("/', "fetch('/", "url(/"):
+            assert absolute not in text, f"{f} contains {absolute}"
+
+
+def test_page_has_required_controls():
+    html = (WEB / "index.html").read_text()
+    for el_id in ("static-view", "guidance", "steps", "digits", "play", "live-view", "status"):
+        assert f'id="{el_id}"' in html, el_id
+    for input_id in re.findall(r'<input[^>]*\bid="([^"]+)"', html):
+        assert f'for="{input_id}"' in html, f"input #{input_id} has no label"
