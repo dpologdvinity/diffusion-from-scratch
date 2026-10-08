@@ -204,3 +204,48 @@ def test_live_result_hidden_until_generated():
     html = (WEB / "index.html").read_text()
     assert re.search(r'<div class="live-output"[^>]*\bhidden\b', html)
     assert '.live-output").hidden = false' in (WEB / "app.js").read_text()
+
+
+def test_live_progress_is_announced_outside_hidden_result():
+    html = (WEB / "index.html").read_text()
+    output = re.search(r'<div class="live-output".*?</div>', html, re.S).group(0)
+    assert 'id="live-meta"' not in output, "progress text must stay visible before the first result"
+    assert re.search(r'<p id="live-meta"[^>]*role="status"', html)
+
+
+# --- bundled weights (clone-and-serve) --------------------------------------------------------
+
+
+def test_export_ema_writes_inference_only_checkpoint(model, tmp_path):
+    from ddpm.train import export_ema, load_ema_model
+
+    src = tmp_path / "full.pt"
+    torch.save({"model": model.state_dict(), "ema": model.state_dict(), "opt": {"big": torch.zeros(10)}, "step": 7,
+                "unet_config": model.config, "schedule": {"T": 50, "kind": "linear"}, "history": [1, 2]}, src)
+    dst = tmp_path / "models" / "slim.pt"
+    export_ema(src, dst)
+    slim = torch.load(dst, weights_only=False)
+    assert set(slim) == {"ema", "unet_config", "schedule", "step"}
+    loaded, sched, ckpt = load_ema_model(dst)
+    assert sched.T == 50 and ckpt["step"] == 7
+    torch.testing.assert_close(loaded.state_dict()["out.2.weight"], model.state_dict()["out.2.weight"])
+
+
+def test_default_checkpoint_prefers_trained_then_bundled(tmp_path):
+    from ddpm.serve import default_checkpoint
+
+    (tmp_path / "models").mkdir()
+    (tmp_path / "models" / "mnist.pt").write_bytes(b"x")
+    assert default_checkpoint(tmp_path) == tmp_path / "models" / "mnist.pt"
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints" / "mnist.pt").write_bytes(b"x")
+    assert default_checkpoint(tmp_path) == tmp_path / "checkpoints" / "mnist.pt"
+
+
+def test_bundled_weights_ship_with_the_repo():
+    from ddpm.train import load_ema_model
+
+    path = Path(__file__).resolve().parent.parent / "models" / "mnist.pt"
+    model, sched, ckpt = load_ema_model(path)
+    assert sum(p.numel() for p in model.parameters()) == 424465
+    assert ckpt["step"] > 0 and path.stat().st_size < 3_000_000

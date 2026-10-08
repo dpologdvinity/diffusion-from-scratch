@@ -33,7 +33,11 @@ function render() {
   $("digits").alt = `Digits 0 to 9 generated with guidance ${s.guidance}, ${s.label}.`;
 }
 
+const animationRuns = new WeakMap(); // img -> id of its current animation; older runs stop ticking
+
 function animate(img, frames, altFinal, done) {
+  const run = (animationRuns.get(img) || 0) + 1;
+  animationRuns.set(img, run);
   if (reducedMotion) {
     img.src = frames[frames.length - 1];
     img.alt = altFinal;
@@ -42,6 +46,7 @@ function animate(img, frames, altFinal, done) {
   }
   let i = 0;
   const tick = () => {
+    if (animationRuns.get(img) !== run) return;
     img.src = frames[i];
     img.alt = `Denoising, frame ${i + 1} of ${frames.length}.`;
     i += 1;
