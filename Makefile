@@ -9,10 +9,11 @@ JOBS    ?= 2
 
 export OMP_NUM_THREADS = 1
 
-.PHONY: test lint toy train resume eval web serve
+.PHONY: test lint toy train resume eval web serve weights
 
 test:
 	uv run pytest -q
+	node --test tests/web/*.test.mjs
 
 lint:
 	uvx ruff check ddpm tests scripts
@@ -38,3 +39,7 @@ web:
 
 serve:
 	uv run python -m ddpm.serve
+
+# Refresh the small inference-only weights committed for clone-and-serve.
+weights:
+	uv run python -c "from ddpm.train import export_ema; export_ema('checkpoints/mnist.pt', 'models/mnist.pt')"

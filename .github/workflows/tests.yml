@@ -19,3 +19,5 @@ jobs:
         run: uvx ruff check ddpm tests scripts
       - name: Test
         run: uv run pytest -q
+      - name: Test web UI
+        run: node --test tests/web/*.test.mjs
