@@ -72,6 +72,12 @@ def cmd_report(args):
     x_test, y_test = data.load(args.dataset, train=False)
     f_test, p_test = predict(clf, x_test)
     clf_acc = (p_test == y_test).float().mean().item()
+    # KID's cubic kernel assumes O(1) dot products; rescale features by the real-data std.
+    feat_scale = f_test.std()
+    kid_ref = f_test[torch.randperm(len(f_test), generator=torch.Generator().manual_seed(0))[:2000]] / feat_scale
+
+    def kid(f):
+        return 1000 * kernel_distance(f / feat_scale, kid_ref)
 
     rows = []
     for path in sorted(runs_dir(args.dataset).glob("*.pt")):
@@ -82,7 +88,7 @@ def cmd_report(args):
             "run": path.stem, "method": r["method"], "steps": r["steps"], "guidance": r["guidance"], "n": len(x),
             "class_acc": (p == r["y"]).float().mean().item(),
             "fid": frechet_distance(f, f_test),
-            "kid_x1000": 1000 * kernel_distance(f, f_test[torch.randperm(len(f_test), generator=torch.Generator().manual_seed(0))[:2000]]),
+            "kid_x1000": kid(f),
             "gen_seconds": r["seconds"],
         })
 
@@ -94,7 +100,7 @@ def cmd_report(args):
     floor = {
         "run": "real_train_images", "n": n, "class_acc": (p_real == y_train[idx]).float().mean().item(),
         "fid": frechet_distance(f_real, f_test),
-        "kid_x1000": 1000 * kernel_distance(f_real, f_test[torch.randperm(len(f_test), generator=torch.Generator().manual_seed(0))[:2000]]),
+        "kid_x1000": kid(f_real),
     }
     report = {"dataset": args.dataset, "classifier_test_acc": clf_acc, "real_floor": floor, "runs": rows}
     (RESULTS / f"{args.dataset}_metrics.json").write_text(json.dumps(report, indent=2))
