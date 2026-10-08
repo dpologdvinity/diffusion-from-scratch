@@ -38,8 +38,8 @@ Size target: well under 1 MB total (28×28 grayscale PNGs compress to a few hund
 
 ## Live API
 
-- `GET /api/health` → `{"status": "ok", "model": {"train_steps": int, "params": int}}`
-- `POST /api/sample` with JSON `{digit: 0–9, guidance: 0–10, sampler: "ddim" | "ddpm", steps: 1–1000 (DDIM only), eta: 0–1, seed: 0–2^31-1, frames: 2–50}` → `{"image": <PNG data URL>, "frames": [<PNG data URL>, ...], "seconds": float}`
+- `GET /api/health` → `{"status": "ok", "datasets": {"mnist": {"train_steps": int, "params": int}, ...}}` (one entry per dataset with weights)
+- `POST /api/sample` with JSON `{dataset: "mnist" | "fashion", label: 0–9, guidance: 0–10, sampler: "ddim" | "ddpm", steps: 1–1000 (DDIM only), eta: 0–1, seed: 0–2^31-1, frames: 2–50}` → `{"image": <PNG data URL>, "frames": [<PNG data URL>, ...], "seconds": float}`
 - Validation via Pydantic models; out-of-range values return 422 with field errors, which the UI shows inline.
 - A lock serializes sampling so concurrent requests queue instead of multiplying CPU use.
 
@@ -58,4 +58,8 @@ Size target: well under 1 MB total (28×28 grayscale PNGs compress to a few hund
 
 ## Out of scope
 
-Hosting the live server online, FashionMNIST in the UI (added later by exporting a second manifest), mobile-specific layouts beyond a responsive single column.
+Hosting the live server online, mobile-specific layouts beyond a responsive single column.
+
+## Addendum: FashionMNIST
+
+Added after the first release. A dataset picker switches both modes. Static assets live per dataset: MNIST at the site root (`manifest.json`, `sprites/`) and FashionMNIST under `fashion/`; each manifest carries its class `labels`, and the page resolves sprite paths against the manifest's folder. The live server loads every dataset with weights (`checkpoints/<dataset>.pt`, else the bundled `models/<dataset>.pt`) and rejects requests for a dataset it has no weights for with a 422.
