@@ -1,0 +1,103 @@
+{
+  "8gaussians": {
+    "DDPM 1000": {
+      "nfe": 1000,
+      "seconds": 34.19,
+      "swd": 0.0293,
+      "class_acc": 1.0
+    },
+    "DDIM 50": {
+      "nfe": 50,
+      "seconds": 1.44,
+      "swd": 0.0314,
+      "class_acc": 1.0
+    },
+    "DDIM 10": {
+      "nfe": 10,
+      "seconds": 0.34,
+      "swd": 0.0328,
+      "class_acc": 1.0
+    },
+    "DDIM 5": {
+      "nfe": 5,
+      "seconds": 0.31,
+      "swd": 0.0425,
+      "class_acc": 1.0
+    },
+    "real vs real": {
+      "swd": 0.0173
+    }
+  },
+  "moons": {
+    "DDPM 1000": {
+      "nfe": 1000,
+      "seconds": 40.15,
+      "swd": 0.0412,
+      "class_acc": 1.0
+    },
+    "DDIM 50": {
+      "nfe": 50,
+      "seconds": 0.94,
+      "swd": 0.0442,
+      "class_acc": 0.9965
+    },
+    "DDIM 10": {
+      "nfe": 10,
+      "seconds": 0.11,
+      "swd": 0.0922,
+      "class_acc": 0.9545
+    },
+    "DDIM 5": {
+      "nfe": 5,
+      "seconds": 0.09,
+      "swd": 0.1704,
+      "class_acc": 0.7445
+    },
+    "real vs real": {
+      "swd": 0.0204
+    }
+  },
+  "spiral": {
+    "DDPM 1000": {
+      "nfe": 1000,
+      "seconds": 32.6,
+      "swd": 0.0377,
+      "class_acc": 0.924
+    },
+    "DDIM 50": {
+      "nfe": 50,
+      "seconds": 0.72,
+      "swd": 0.0787,
+      "class_acc": 0.867
+    },
+    "DDIM 10": {
+      "nfe": 10,
+      "seconds": 0.58,
+      "swd": 0.1389,
+      "class_acc": 0.5785
+    },
+    "DDIM 5": {
+      "nfe": 5,
+      "seconds": 0.05,
+      "swd": 0.2334,
+      "class_acc": 0.2925
+    },
+    "real vs real": {
+      "swd": 0.0153
+    }
+  },
+  "8gaussians_guidance": {
+    "w=0.0": {
+      "class_acc": 0.17
+    },
+    "w=1.0": {
+      "class_acc": 1.0
+    },
+    "w=3.0": {
+      "class_acc": 1.0
+    },
+    "w=7.0": {
+      "class_acc": 1.0
+    }
+  }
+}
