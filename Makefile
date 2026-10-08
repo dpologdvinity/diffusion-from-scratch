@@ -4,6 +4,7 @@
 DATASET ?= mnist
 MINUTES ?= 60
 WORKERS ?= 2
+BATCH   ?= 26
 N       ?= 100
 JOBS    ?= 2
 
@@ -23,12 +24,12 @@ toy:
 
 train:
 	nice -n 10 uv run torchrun --standalone --nproc-per-node $(WORKERS) -m ddpm.train \
-	  --dataset $(DATASET) --threads 1 --batch-size 26 --lr 4e-4 --warmup 200 \
+	  --dataset $(DATASET) --threads 1 --batch-size $(BATCH) --lr 4e-4 --warmup 200 \
 	  --steps 100000 --minutes $(MINUTES) --log-every 50 --ckpt-every 250 --preview-every 1000
 
 resume:
 	nice -n 10 uv run torchrun --standalone --nproc-per-node $(WORKERS) -m ddpm.train \
-	  --dataset $(DATASET) --threads 1 --batch-size 26 --lr 4e-4 --warmup 200 \
+	  --dataset $(DATASET) --threads 1 --batch-size $(BATCH) --lr 4e-4 --warmup 200 \
 	  --steps 100000 --minutes $(MINUTES) --log-every 50 --ckpt-every 250 --preview-every 1000 --resume
 
 eval:
