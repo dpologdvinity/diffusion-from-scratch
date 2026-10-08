@@ -59,6 +59,13 @@ def load_ema_model(path: str | Path) -> tuple[UNet, NoiseSchedule, dict]:
     return model, NoiseSchedule(**ckpt["schedule"]), ckpt
 
 
+def export_ema(src: str | Path, dst: str | Path):
+    """Write an inference-only checkpoint (EMA weights, config, schedule) small enough to commit."""
+    ckpt = torch.load(src, map_location="cpu", weights_only=False)
+    Path(dst).parent.mkdir(parents=True, exist_ok=True)
+    torch.save({k: ckpt[k] for k in ("ema", "unet_config", "schedule", "step")}, dst)
+
+
 @torch.no_grad()
 def update_ema(ema, model, decay: float):
     for pe, pm in zip(ema.parameters(), model.parameters()):

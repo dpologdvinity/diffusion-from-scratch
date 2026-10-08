@@ -62,20 +62,27 @@ def create_app(model, sched, web_dir: Path, assets_dir: Path | None, model_info:
     return app
 
 
+def default_checkpoint(root: Path) -> Path:
+    """A locally trained checkpoint if there is one, otherwise the weights bundled with the repo."""
+    trained = root / "checkpoints" / "mnist.pt"
+    return trained if trained.exists() else root / "models" / "mnist.pt"
+
+
 def main(argv: list[str] | None = None):
+    root = Path(__file__).resolve().parent.parent
     p = argparse.ArgumentParser()
-    p.add_argument("--ckpt", default="checkpoints/mnist.pt")
+    p.add_argument("--ckpt", default=None, help="default: checkpoints/mnist.pt if trained, else models/mnist.pt")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
     args = p.parse_args(argv)
+    args.ckpt = args.ckpt or default_checkpoint(root)
     if not Path(args.ckpt).exists():
         raise SystemExit(f"checkpoint not found: {args.ckpt}. Train one with `make train` first.")
     torch.set_num_threads(1)
     model, sched, ckpt = load_ema_model(args.ckpt)
     info = {"train_steps": ckpt["step"], "params": sum(p.numel() for p in model.parameters())}
-    root = Path(__file__).resolve().parent.parent
     app = create_app(model, sched, root / "web", root / "docs", info)
-    print(f"serving on http://{args.host}:{args.port}  (API docs at /api/docs)")
+    print(f"serving {args.ckpt} on http://{args.host}:{args.port}  (API docs at /api/docs)")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
