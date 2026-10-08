@@ -1,0 +1,43 @@
+{
+  "dataset": "mnist",
+  "batch": 10,
+  "guidance": 2.0,
+  "threads": 1,
+  "results": [
+    {
+      "method": "ddim",
+      "steps": 50,
+      "seconds": 14.735021032999612,
+      "ms_per_image": 1473.5021032999612,
+      "speedup_vs_ddpm": 16.381318785254773
+    },
+    {
+      "method": "ddpm",
+      "steps": 1000,
+      "seconds": 241.37907684900074,
+      "ms_per_image": 24137.907684900074,
+      "speedup_vs_ddpm": 1.0
+    },
+    {
+      "method": "ddim",
+      "steps": 50,
+      "seconds": 6.180775621999601,
+      "ms_per_image": 618.0775621999601,
+      "speedup_vs_ddpm": 39.05320167097571
+    },
+    {
+      "method": "ddim",
+      "steps": 20,
+      "seconds": 2.5387888300001578,
+      "ms_per_image": 253.87888300001578,
+      "speedup_vs_ddpm": 95.07646874631386
+    },
+    {
+      "method": "ddim",
+      "steps": 10,
+      "seconds": 1.305766969000615,
+      "ms_per_image": 130.5766969000615,
+      "speedup_vs_ddpm": 184.85616697268978
+    }
+  ]
+}
