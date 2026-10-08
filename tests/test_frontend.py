@@ -1,4 +1,5 @@
 import io
+import json
 
 import pytest
 import torch
@@ -66,3 +67,27 @@ def test_png_data_url_prefix():
     from ddpm.render import png_data_url
 
     assert png_data_url(torch.zeros(1, 1, 28, 28)).startswith("data:image/png;base64,")
+
+
+# --- static export ----------------------------------------------------------------------
+
+
+def test_export_writes_consistent_manifest(model, tmp_path):
+    from ddpm.export_web import export
+
+    web_dir = tmp_path / "web"
+    web_dir.mkdir()
+    (web_dir / "index.html").write_text("<!doctype html>")
+    out = tmp_path / "docs"
+    manifest = export(model, NoiseSchedule(50), out, web_dir, guidances=(0, 2), steps=(5,), traj_frames=3,
+                      model_info={"train_steps": 1, "params": 2})
+
+    assert (out / "index.html").exists()
+    assert json.loads((out / "manifest.json").read_text()) == manifest
+    assert set(manifest["grid"]) == {"w0_s5", "w2_s5"}
+    assert manifest["ddpm"]["sprite"] and len(manifest["trajectory"]["frames"]) == 3
+    sprites = list(manifest["grid"].values()) + [manifest["ddpm"]["sprite"]] + manifest["trajectory"]["frames"]
+    for rel in sprites:
+        assert not rel.startswith("/")
+        assert Image.open(out / rel).size == (280, 28)
+    assert manifest["model"] == {"train_steps": 1, "params": 2}

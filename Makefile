@@ -9,7 +9,7 @@ JOBS    ?= 2
 
 export OMP_NUM_THREADS = 1
 
-.PHONY: test lint toy train resume eval
+.PHONY: test lint toy train resume eval web
 
 test:
 	uv run pytest -q
@@ -32,3 +32,6 @@ resume:
 
 eval:
 	scripts/run_eval.sh $(DATASET) $(N) $(JOBS)
+
+web:
+	nice -n 10 uv run python -m ddpm.export_web
