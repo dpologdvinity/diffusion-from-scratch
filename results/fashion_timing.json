@@ -1,0 +1,43 @@
+{
+  "dataset": "fashion",
+  "batch": 10,
+  "guidance": 2.0,
+  "threads": 1,
+  "results": [
+    {
+      "method": "ddim",
+      "steps": 50,
+      "seconds": 2.638769985002,
+      "ms_per_image": 263.8769985002,
+      "speedup_vs_ddpm": 18.584219637077926
+    },
+    {
+      "method": "ddpm",
+      "steps": 1000,
+      "seconds": 49.03948097300599,
+      "ms_per_image": 4903.948097300599,
+      "speedup_vs_ddpm": 1.0
+    },
+    {
+      "method": "ddim",
+      "steps": 50,
+      "seconds": 2.3243118209938984,
+      "ms_per_image": 232.43118209938984,
+      "speedup_vs_ddpm": 21.09849484482518
+    },
+    {
+      "method": "ddim",
+      "steps": 20,
+      "seconds": 1.051880719998735,
+      "ms_per_image": 105.1880719998735,
+      "speedup_vs_ddpm": 46.62076226006402
+    },
+    {
+      "method": "ddim",
+      "steps": 10,
+      "seconds": 0.4295035110117169,
+      "ms_per_image": 42.95035110117169,
+      "speedup_vs_ddpm": 114.17713642780487
+    }
+  ]
+}
