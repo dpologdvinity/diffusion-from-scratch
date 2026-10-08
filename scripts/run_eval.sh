@@ -40,6 +40,8 @@ configs+=(
   "--method ddim --steps 10 --guidance $W --eta 1"
 )
 
+# Start clean: leftover samples from an earlier run (e.g. a different shard count) would be merged in.
+rm -rf results/runs/"$DATASET"
 mkdir -p results/runs/"$DATASET"
 for cfg in "${configs[@]}"; do
   while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n; done
