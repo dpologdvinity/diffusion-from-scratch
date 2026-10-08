@@ -17,7 +17,6 @@ run() { nice -n 10 uv run python -m ddpm.evaluate "$@"; }
 
 configs=(
   "--method ddpm --steps 1000 --guidance $W"
-  "--method ddim --steps 250 --guidance $W"
   "--method ddim --steps 100 --guidance $W"
   "--method ddim --steps 50 --guidance $W"
   "--method ddim --steps 20 --guidance $W"
@@ -38,4 +37,4 @@ wait
 
 run report --dataset "$DATASET" --sweep-guidance "$W"
 run figures --dataset "$DATASET" --sweep-guidance "$W"
-run timing --dataset "$DATASET" --guidance "$W"
+run timing --dataset "$DATASET" --guidance "$W" --batch 10
