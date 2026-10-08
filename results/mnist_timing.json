@@ -7,37 +7,37 @@
     {
       "method": "ddim",
       "steps": 50,
-      "seconds": 2.564551716999631,
-      "ms_per_image": 256.4551716999631,
-      "speedup_vs_ddpm": 18.745554697272443
+      "seconds": 2.707803003999288,
+      "ms_per_image": 270.7803003999288,
+      "speedup_vs_ddpm": 18.104121365030686
     },
     {
       "method": "ddpm",
       "steps": 1000,
-      "seconds": 48.07394448500054,
-      "ms_per_image": 4807.394448500054,
+      "seconds": 49.02239421699778,
+      "ms_per_image": 4902.239421699778,
       "speedup_vs_ddpm": 1.0
     },
     {
       "method": "ddim",
       "steps": 50,
-      "seconds": 3.0561737250009173,
-      "ms_per_image": 305.61737250009173,
-      "speedup_vs_ddpm": 15.730108564095488
+      "seconds": 2.348314050999761,
+      "ms_per_image": 234.8314050999761,
+      "speedup_vs_ddpm": 20.87556994181728
     },
     {
       "method": "ddim",
       "steps": 20,
-      "seconds": 1.28963526500047,
-      "ms_per_image": 128.963526500047,
-      "speedup_vs_ddpm": 37.27716338850505
+      "seconds": 0.9637358860054519,
+      "ms_per_image": 96.37358860054519,
+      "speedup_vs_ddpm": 50.867042442705575
     },
     {
       "method": "ddim",
       "steps": 10,
-      "seconds": 0.6379532289993222,
-      "ms_per_image": 63.795322899932216,
-      "speedup_vs_ddpm": 75.35653446007029
+      "seconds": 0.43488100199465407,
+      "ms_per_image": 43.48810019946541,
+      "speedup_vs_ddpm": 112.72599628898115
     }
   ]
 }
