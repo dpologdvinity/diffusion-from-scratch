@@ -27,8 +27,12 @@ function render() {
   const isDdpm = Number($("steps").value) === manifest.steps.length;
   $("guidance").disabled = isDdpm;
   const s = currentSetting();
-  $("guidance-value").textContent = isDdpm ? `${s.guidance} (fixed for DDPM)` : String(s.guidance);
+  const guidanceText = isDdpm ? `${s.guidance} (fixed for DDPM)` : String(s.guidance);
+  $("guidance-value").textContent = guidanceText;
   $("steps-value").textContent = s.label;
+  // Slider positions are indices into the manifest; tell assistive tech the real values.
+  $("guidance").setAttribute("aria-valuetext", guidanceText);
+  $("steps").setAttribute("aria-valuetext", s.label);
   $("digits").src = s.src;
   $("digits").alt = `Digits 0 to 9 generated with guidance ${s.guidance}, ${s.label}.`;
 }
@@ -65,6 +69,8 @@ function play() {
   frames.forEach((src) => { new Image().src = src; }); // warm the cache before animating
   playing = true;
   $("play").disabled = true;
+  $("guidance-value").textContent = `${t.guidance} (during playback)`;
+  $("steps-value").textContent = `DDIM, ${t.steps} steps (during playback)`;
   animate($("digits"), frames, `Digits 0 to 9 after ${t.steps} DDIM steps at guidance ${t.guidance}.`, () => {
     setTimeout(() => {
       playing = false;
@@ -108,11 +114,26 @@ async function probeLive() {
   }
 }
 
-function showErrors(body) {
-  const detail = Array.isArray(body && body.detail) ? body.detail : [];
-  $("live-error").textContent = detail.length
-    ? detail.map((d) => `${d.loc[d.loc.length - 1]}: ${d.msg}`).join("; ")
-    : "Sampling failed.";
+// The DDIM-only fields are disabled for DDPM; leave them out so stale values can't fail validation.
+function buildRequest(v) {
+  const req = { digit: Number(v.digit), guidance: Number(v.guidance), sampler: v.sampler, seed: Number(v.seed), frames: 25 };
+  if (v.sampler === "ddim") {
+    req.steps = Number(v.steps);
+    req.eta = Number(v.eta);
+  }
+  return req;
+}
+
+function errorMessage(status, text) {
+  try {
+    const detail = JSON.parse(text).detail;
+    if (Array.isArray(detail) && detail.length) {
+      return detail.map((d) => `${d.loc[d.loc.length - 1]}: ${d.msg}`).join("; ");
+    }
+  } catch {
+    // not JSON: fall through to the status code
+  }
+  return `Server error (HTTP ${status}).`;
 }
 
 function setupLive() {
@@ -135,36 +156,44 @@ function setupLive() {
   $("live-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = event.submitter || $("live-form").querySelector("button");
-    const req = {
-      digit: Number($("live-digit").value),
-      guidance: Number($("live-guidance").value),
+    const req = buildRequest({
+      digit: $("live-digit").value,
+      guidance: $("live-guidance").value,
       sampler: $("live-sampler").value,
-      steps: Number($("live-steps").value),
-      eta: Number($("live-eta").value),
-      seed: Number($("live-seed").value),
-      frames: 25,
-    };
+      steps: $("live-steps").value,
+      eta: $("live-eta").value,
+      seed: $("live-seed").value,
+    });
     $("live-error").textContent = "";
     button.disabled = true;
     $("live-meta").textContent = "Sampling…";
+    let r;
     try {
-      const r = await fetch("api/sample", {
+      r = await fetch("api/sample", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req),
       });
-      const body = await r.json();
+    } catch {
+      $("live-error").textContent = "Could not reach the local server.";
+      $("live-meta").textContent = "";
+      button.disabled = false;
+      return;
+    }
+    try {
+      const text = await r.text();
       if (!r.ok) {
-        showErrors(body);
+        $("live-error").textContent = errorMessage(r.status, text);
         $("live-meta").textContent = "";
         return;
       }
+      const body = JSON.parse(text);
       const steps = req.sampler === "ddpm" ? "DDPM 1000 steps" : `DDIM ${req.steps} steps`;
       $("live-meta").textContent = `Digit ${req.digit}, guidance ${req.guidance}, ${steps}, seed ${req.seed}: ${body.seconds}s on one CPU thread.`;
       document.querySelector(".live-output").hidden = false;
       animate($("live-image"), body.frames, `Generated digit ${req.digit}, guidance ${req.guidance}, ${steps}.`, () => {});
     } catch {
-      $("live-error").textContent = "Could not reach the local server.";
+      $("live-error").textContent = errorMessage(r.status, "");
       $("live-meta").textContent = "";
     } finally {
       button.disabled = false;
