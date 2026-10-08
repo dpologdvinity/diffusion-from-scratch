@@ -64,13 +64,15 @@ def export(model, sched, out_dir: Path, web_dir: Path, guidances=(0, 1, 2, 3, 5)
     return manifest
 
 
-def main():
+def main(argv: list[str] | None = None):
     p = argparse.ArgumentParser()
     p.add_argument("--ckpt", default="checkpoints/mnist.pt")
     p.add_argument("--out", type=Path, default=Path("docs"))
     p.add_argument("--web", type=Path, default=Path("web"))
     p.add_argument("--threads", type=int, default=1)
-    args = p.parse_args()
+    args = p.parse_args(argv)
+    if not Path(args.ckpt).exists():
+        raise SystemExit(f"checkpoint not found: {args.ckpt}. Train one with `make train` first.")
     torch.set_num_threads(args.threads)
     model, sched, ckpt = load_ema_model(args.ckpt)
     info = {"train_steps": ckpt["step"], "params": sum(p.numel() for p in model.parameters())}

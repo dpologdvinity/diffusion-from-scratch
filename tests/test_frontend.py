@@ -249,3 +249,10 @@ def test_bundled_weights_ship_with_the_repo():
     model, sched, ckpt = load_ema_model(path)
     assert sum(p.numel() for p in model.parameters()) == 424465
     assert ckpt["step"] > 0 and path.stat().st_size < 3_000_000
+
+
+def test_export_missing_checkpoint_message():
+    from ddpm.export_web import main
+
+    with pytest.raises(SystemExit, match="make train"):
+        main(["--ckpt", "does-not-exist.pt"])
