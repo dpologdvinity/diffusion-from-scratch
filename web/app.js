@@ -252,6 +252,12 @@ function setupLive() {
   });
 }
 
+// ?dataset=fashion opens that dataset directly (falls back to the first available one).
+function initialDataset(search, available) {
+  const wanted = new URLSearchParams(search).get("dataset");
+  return available.includes(wanted) ? wanted : available[0];
+}
+
 async function init() {
   for (const d of DATASETS) manifests[d.id] = await fetchManifest(d);
   const health = await probeLive();
@@ -269,8 +275,9 @@ async function init() {
     updateStatus();
     return;
   }
-  $("dataset").value = available[0];
-  selectDataset(available[0]);
+  const first = initialDataset(window.location ? window.location.search : "", available);
+  $("dataset").value = first;
+  selectDataset(first);
 }
 
 init();

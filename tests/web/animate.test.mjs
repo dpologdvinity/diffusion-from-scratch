@@ -18,6 +18,7 @@ function load() {
     clearTimeout() {},
     AbortController: class { constructor() { this.signal = {}; } abort() {} },
     Image: class {},
+    URLSearchParams,
     console,
   };
   vm.createContext(sandbox);
@@ -100,4 +101,11 @@ test("live requests name the dataset and class", () => {
   assert.equal(req.dataset, "fashion");
   assert.equal(req.label, 8);
   assert.equal("digit" in req, false);
+});
+
+test("a ?dataset= link picks that dataset when it is available", () => {
+  const { sandbox } = load();
+  assert.equal(sandbox.initialDataset("?dataset=fashion", ["mnist", "fashion"]), "fashion");
+  assert.equal(sandbox.initialDataset("?dataset=fashion", ["mnist"]), "mnist");
+  assert.equal(sandbox.initialDataset("", ["mnist", "fashion"]), "mnist");
 });
