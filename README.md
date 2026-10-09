@@ -6,7 +6,7 @@ A class-conditional **DDPM** with **classifier-free guidance** and **DDIM** samp
 
 ## Try it
 
-- **In the browser:** [interactive demo](https://dpologdvinity.github.io/diffusion-from-scratch/). Switch between MNIST and FashionMNIST, drag the guidance and sampler sliders over precomputed samples (every setting starts from the same noise), and watch the samples denoise.
+- **In the browser:** [interactive demo](https://dpologdvinity.github.io/diffusion-from-scratch/). Switch between MNIST and FashionMNIST ([direct link](https://dpologdvinity.github.io/diffusion-from-scratch/?dataset=fashion)), drag the guidance and sampler sliders over precomputed samples (every setting starts from the same noise), and watch the samples denoise.
 - **Locally, with live sampling:** clone the repo, then `uv sync && make serve` and open http://127.0.0.1:8000. Pick a dataset, class, seed, guidance weight, sampler, step count, and η; the model runs on one CPU thread. The trained weights for both datasets ship with the repo (`models/*.pt`, 1.7 MB each, EMA weights only), so no training is needed; a checkpoint you train yourself (`make train`) takes precedence. API docs are at `/api/docs`.
 
 ## Results (MNIST)

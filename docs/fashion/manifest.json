@@ -1,19 +1,19 @@
 {
   "model": {
-    "train_steps": 15351,
+    "train_steps": 15921,
     "params": 424465
   },
   "labels": [
-    "0",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9"
+    "T-shirt",
+    "Trouser",
+    "Pullover",
+    "Dress",
+    "Coat",
+    "Sandal",
+    "Shirt",
+    "Sneaker",
+    "Bag",
+    "Boot"
   ],
   "digits": [
     0,
