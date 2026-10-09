@@ -101,6 +101,28 @@ Guidance behaves as on MNIST, but the plain conditional model (w = 1) is weaker 
 
 ![guidance comparison](results/fashion_guidance_comparison.png)
 
+## Ablation: cosine vs linear noise schedule (MNIST)
+
+A second MNIST model trained with the cosine schedule (Nichol & Dhariwal 2021) instead of the linear one, with the same UNet, optimizer, learning rate, and step count (15,351), then scored with the same sampler configs, seeds, and classifier at N = 1,000. It was trained and evaluated on a Kaggle T4 GPU in about 15 minutes ([`scripts/gpu_ablation.py`](scripts/gpu_ablation.py)); training alone took 7.5 minutes against about 3 hours on the laptop CPU. As a check, the same GPU run re-scored the linear model and reproduced every CPU number above to within 0.0003, because sampling noise is drawn on the CPU from the same seeds either way.
+
+| sampler | FID, linear | FID, cosine | class acc, linear | class acc, cosine |
+|---|---|---|---|---|
+| DDPM 1000, w = 2 | 28.0 | 22.5 | 99.9% | 99.6% |
+| DDIM 100, w = 2 | 18.7 | 11.6 | 99.8% | 99.6% |
+| DDIM 50, w = 2 | 19.0 | 11.1 | 99.9% | 99.8% |
+| DDIM 20, w = 2 | 19.4 | 9.5 | 99.9% | 99.3% |
+| DDIM 10, w = 2 | 18.6 | 10.2 | 99.9% | 98.4% |
+| DDIM 50, w = 2, η = 1 | 30.1 | 24.7 | 100.0% | 100.0% |
+| DDIM 50, w = 1 | 8.5 | 18.8 | 92.7% | 88.1% |
+| DDIM 50, w = 0 | 76.4 | 91.1 | 10.7% | 10.9% |
+| DDIM 50, w = 3 | 45.4 | 32.6 | 100.0% | 99.9% |
+
+**The cosine schedule helps guided, few-step sampling the most.** With guidance w = 2, it cuts FID at every DDIM step count, by 40–50% at 10–50 steps (DDIM 20: 19.4 → 9.5), and DDPM improves too (28.0 → 22.5). The linear schedule destroys signal quickly, so many of its 1000 timesteps sit at almost pure noise; the cosine schedule spreads them more evenly, which gives a coarse DDIM subsequence more useful steps.
+
+**It does not help everywhere.** The plain conditional model (w = 1) and the unconditional model (w = 0) are worse with cosine, and few-step class accuracy drops slightly (98.4% at 10 steps vs 99.9%). One confound: the linear model's first 1,812 steps used a larger batch (130 vs 52), so it saw about 18% more training images (0.94M vs 0.80M), which may account for part of its edge on the unguided samples. Training losses are not comparable across schedules, because each schedule weights the timesteps differently.
+
+![cosine sampler comparison](results/cosine/mnist_sampler_comparison.png)
+
 ## What's implemented
 
 | Piece | Where | Notes |
@@ -151,6 +173,8 @@ make serve                      # local demo with live sampling at http://127.0.
 
 Variables: `DATASET=mnist|fashion`, `WORKERS`, `MINUTES`, `N`, `JOBS`; `make resume` continues from the last checkpoint. Long jobs run under `nice` with `OMP_NUM_THREADS=1`: on a contended CPU, single-threaded DDP workers sync once per step and scale far better than intra-op threads.
 
+With a GPU, `python scripts/gpu_ablation.py --repo . --out out` trains and evaluates the cosine-schedule model end to end in about 20 minutes (`--device` on `ddpm.train` and `ddpm.evaluate generate` selects the device).
+
 Larger evaluations can split the expensive DDPM run across processes; shards reproduce the unsharded samples exactly and are merged automatically:
 
 ```bash
@@ -165,7 +189,7 @@ for i in 0 1 2 3; do uv run python -m ddpm.evaluate generate --method ddpm --n 1
 - [x] FashionMNIST model and evaluation
 - [x] Larger evaluation (N = 1,000 per config) for tighter FID/KID estimates
 - [x] DDIM η ablation (η ∈ {0, 0.5, 1})
-- [ ] Cosine vs linear noise schedule (needs a full retrain)
+- [x] Cosine vs linear noise schedule (trained and evaluated on a Kaggle GPU)
 
 ## Evaluation caveats
 
