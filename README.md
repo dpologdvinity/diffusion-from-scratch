@@ -103,23 +103,25 @@ Guidance behaves as on MNIST, but the plain conditional model (w = 1) is weaker 
 
 ## Ablation: cosine vs linear noise schedule (MNIST)
 
-A second MNIST model trained with the cosine schedule (Nichol & Dhariwal 2021) instead of the linear one, with the same UNet, optimizer, learning rate, and step count (15,351), then scored with the same sampler configs, seeds, and classifier at N = 1,000. It was trained and evaluated on a Kaggle T4 GPU in about 15 minutes ([`scripts/gpu_ablation.py`](scripts/gpu_ablation.py)); training alone took 7.5 minutes against about 3 hours on the laptop CPU. As a check, the same GPU run re-scored the linear model and reproduced every CPU number above to within 0.0003, because sampling noise is drawn on the CPU from the same seeds either way.
+Two MNIST models that differ only in the noise schedule: linear (Ho et al. 2020) and cosine (Nichol & Dhariwal 2021), each trained with the same UNet, optimizer, learning rate, batch size (52), and step count (15,351), then scored with the same sampler configs, seeds, and classifier at N = 1,000. Both were trained and evaluated on a Kaggle T4 GPU ([`scripts/gpu_ablation.py`](scripts/gpu_ablation.py)); each training run took about 7.5 minutes, against about 3 hours on the laptop CPU. As a check, the GPU run also re-scored the CPU-trained model from the sections above and reproduced every number to within 0.0003, because sampling noise is drawn on the CPU from the same seeds either way.
 
 | sampler | FID, linear | FID, cosine | class acc, linear | class acc, cosine |
 |---|---|---|---|---|
-| DDPM 1000, w = 2 | 28.0 | 22.5 | 99.9% | 99.6% |
-| DDIM 100, w = 2 | 18.7 | 11.6 | 99.8% | 99.6% |
-| DDIM 50, w = 2 | 19.0 | 11.1 | 99.9% | 99.8% |
-| DDIM 20, w = 2 | 19.4 | 9.5 | 99.9% | 99.3% |
-| DDIM 10, w = 2 | 18.6 | 10.2 | 99.9% | 98.4% |
-| DDIM 50, w = 2, η = 1 | 30.1 | 24.7 | 100.0% | 100.0% |
-| DDIM 50, w = 1 | 8.5 | 18.8 | 92.7% | 88.1% |
-| DDIM 50, w = 0 | 76.4 | 91.1 | 10.7% | 10.9% |
-| DDIM 50, w = 3 | 45.4 | 32.6 | 100.0% | 99.9% |
+| DDPM 1000, w = 2 | 25.4 | 22.5 | 100.0% | 99.6% |
+| DDIM 100, w = 2 | 16.9 | 11.6 | 99.8% | 99.6% |
+| DDIM 50, w = 2 | 16.9 | 11.1 | 99.7% | 99.8% |
+| DDIM 20, w = 2 | 17.2 | 9.5 | 99.8% | 99.3% |
+| DDIM 10, w = 2 | 16.4 | 10.2 | 99.9% | 98.4% |
+| DDIM 50, w = 2, η = 1 | 28.7 | 24.7 | 100.0% | 100.0% |
+| DDIM 50, w = 1 | 9.5 | 18.8 | 91.8% | 88.1% |
+| DDIM 50, w = 0 | 76.9 | 91.1 | 10.4% | 10.9% |
+| DDIM 50, w = 3 | 41.7 | 32.6 | 100.0% | 99.9% |
 
-**The cosine schedule helps guided, few-step sampling the most.** With guidance w = 2, it cuts FID at every DDIM step count, by 40–50% at 10–50 steps (DDIM 20: 19.4 → 9.5), and DDPM improves too (28.0 → 22.5). The linear schedule destroys signal quickly, so many of its 1000 timesteps sit at almost pure noise; the cosine schedule spreads them more evenly, which gives a coarse DDIM subsequence more useful steps.
+**The cosine schedule helps guided sampling at every step count.** With guidance w = 2 it cuts DDIM FID by 32–45% (DDIM 20: 17.2 → 9.5), and DDPM improves too (25.4 → 22.5). The linear schedule destroys signal quickly, so many of its 1000 timesteps sit at almost pure noise; the cosine schedule spreads them more evenly, which gives a coarse DDIM subsequence more useful steps.
 
-**It does not help everywhere.** The plain conditional model (w = 1) and the unconditional model (w = 0) are worse with cosine, and few-step class accuracy drops slightly (98.4% at 10 steps vs 99.9%). One confound: the linear model's first 1,812 steps used a larger batch (130 vs 52), so it saw about 18% more training images (0.94M vs 0.80M), which may account for part of its edge on the unguided samples. Training losses are not comparable across schedules, because each schedule weights the timesteps differently.
+**It hurts unguided sampling.** The plain conditional model (w = 1) roughly doubles its FID with cosine (9.5 → 18.8), the unconditional model (w = 0) is also worse, and few-step class accuracy drops slightly (98.4% at 10 steps vs 99.9%). This is not a training-budget artifact: an earlier comparison against the CPU-trained linear model, which saw 18% more images, showed the same pattern, and this matched rerun keeps it. Training losses are not comparable across schedules, because each schedule weights the timesteps differently.
+
+(The CPU-trained linear model in the sections above scores slightly worse than the matched GPU one with guidance, e.g. DDIM 50 at w = 2: 19.0 vs 16.9, a reminder that training setup and run-to-run variation move FID by a few points, which is why both models in this table were trained the same way.)
 
 ![cosine sampler comparison](results/cosine/mnist_sampler_comparison.png)
 
