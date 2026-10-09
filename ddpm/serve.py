@@ -6,6 +6,7 @@ Sampling runs on one CPU thread, one request at a time, so the server stays ligh
 """
 
 import argparse
+import asyncio
 import threading
 import time
 from pathlib import Path
@@ -13,12 +14,13 @@ from typing import Literal
 
 import torch
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .render import png_data_url, sample_frames
+from .sampling import SamplingCancelled
 from .train import load_ema_model
 
 _lock = threading.Lock()
@@ -38,6 +40,21 @@ class SampleRequest(BaseModel):
     frames: int = Field(11, ge=2, le=50)
 
 
+async def run_unless_disconnected(work, is_disconnected, poll: float = 0.25):
+    """Run work(cancel_event) in a worker thread, setting the event if the client goes away.
+
+    Without this, a closed or reloaded page would keep sampling (up to a few minutes for DDPM)
+    while holding the lock, and every later request would wait behind it.
+    """
+    cancel = threading.Event()
+    future = asyncio.get_running_loop().run_in_executor(None, work, cancel)
+    while not future.done():
+        await asyncio.wait({future}, timeout=poll)
+        if not future.done() and await is_disconnected():
+            cancel.set()
+    return await future
+
+
 def create_app(models: dict[str, tuple], web_dir: Path, assets_dir: Path | None) -> FastAPI:
     """models maps dataset name -> (model, schedule, info) for every dataset with weights."""
     app = FastAPI(title="Diffusion from scratch", docs_url="/api/docs", openapi_url="/api/openapi.json")
@@ -47,19 +64,28 @@ def create_app(models: dict[str, tuple], web_dir: Path, assets_dir: Path | None)
         return {"status": "ok", "datasets": {name: info for name, (_, _, info) in models.items()}}
 
     @app.post("/api/sample")
-    def sample(req: SampleRequest):
+    async def sample(req: SampleRequest, request: Request):
         if req.dataset not in models:
             raise HTTPException(422, detail=[{"loc": ["body", "dataset"], "msg": f"no weights loaded for {req.dataset}",
                                               "type": "value_error"}])
         model, sched, _ = models[req.dataset]
         steps = min(req.steps, sched.T)
-        with _lock:
-            t0 = time.perf_counter()
-            final, frames = sample_frames(model, sched, torch.tensor([req.label]), guidance=req.guidance,
-                                          sampler=req.sampler, steps=steps, eta=req.eta, seed=req.seed,
-                                          frames=req.frames)
-            secs = time.perf_counter() - t0
-        return {"image": png_data_url(final), "frames": [png_data_url(f) for f in frames], "seconds": round(secs, 3)}
+
+        def work(cancel: threading.Event):
+            with _lock:
+                if cancel.is_set():  # the client left while this request was queued
+                    raise SamplingCancelled
+                t0 = time.perf_counter()
+                final, frames = sample_frames(model, sched, torch.tensor([req.label]), guidance=req.guidance,
+                                              sampler=req.sampler, steps=steps, eta=req.eta, seed=req.seed,
+                                              frames=req.frames, cancel=cancel.is_set)
+                secs = time.perf_counter() - t0
+            return {"image": png_data_url(final), "frames": [png_data_url(f) for f in frames], "seconds": round(secs, 3)}
+
+        try:
+            return await run_unless_disconnected(work, request.is_disconnected)
+        except SamplingCancelled:
+            return Response(status_code=499)  # client closed request; nobody reads this
 
     # Precomputed assets from `make web`, if present, so the static grid also works locally.
     if assets_dir is not None and (assets_dir / "manifest.json").exists():

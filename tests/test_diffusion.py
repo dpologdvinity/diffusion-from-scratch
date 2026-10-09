@@ -216,3 +216,18 @@ def test_sampling_noise_comes_from_the_cpu_generator(sched):
                device="cpu", return_trajectory=True)[1][0]
     b = torch.randn((2, 2), generator=torch.Generator().manual_seed(4))
     torch.testing.assert_close(a, b)
+
+
+def test_sampling_stops_when_cancelled(sched):
+    from ddpm.sampling import SamplingCancelled
+
+    calls = []
+
+    def cancel():
+        calls.append(1)
+        return len(calls) > 3
+
+    model = OracleModel(sched, torch.tensor([[0.3, -0.7]]))
+    with pytest.raises(SamplingCancelled):
+        sample(model, sched, (1, 2), method="ddpm", clip=False, cancel=cancel)
+    assert len(calls) == 4  # stopped at the first check that said so, not after 1000 steps

@@ -15,6 +15,10 @@ import torch
 from .schedule import NoiseSchedule, extract
 
 
+class SamplingCancelled(Exception):
+    """Raised when sample()'s cancel callback asks it to stop."""
+
+
 def guided_eps(model, x, t, y, guidance: float, null_label: int) -> torch.Tensor:
     """Classifier-free guidance (Ho & Salimans 2022).
 
@@ -103,6 +107,7 @@ def sample(
     generator: torch.Generator | None = None,
     return_trajectory: bool = False,
     device: torch.device | str | None = None,
+    cancel=None,
 ):
     """Generate samples starting from pure noise x_T ~ N(0, I).
 
@@ -111,6 +116,8 @@ def sample(
 
     Noise is always drawn from the (CPU) generator and then moved to `device` (default: the
     model's device), so a GPU run starts from exactly the same noise as a CPU run.
+
+    cancel, if given, is called before every step; returning True raises SamplingCancelled.
     """
     if device is None:
         device = next((p.device for p in model.parameters()), torch.device("cpu"))
@@ -126,8 +133,13 @@ def sample(
     def batch_t(v):
         return torch.full((shape[0],), v, dtype=torch.long, device=device)
 
+    def check():
+        if cancel is not None and cancel():
+            raise SamplingCancelled
+
     if method == "ddpm":
         for t in range(sched.T - 1, -1, -1):
+            check()
             tt = batch_t(t)
             eps = guided_eps(model, x, tt, y, guidance, null_label)
             x = ddpm_step(sched, x, tt, eps, randn_like(x), clip)
@@ -136,6 +148,7 @@ def sample(
     elif method == "ddim":
         ts = ddim_timesteps(sched.T, steps)
         for i, t in enumerate(ts):
+            check()
             t_prev = ts[i + 1] if i + 1 < len(ts) else -1
             tt = batch_t(t)
             eps = guided_eps(model, x, tt, y, guidance, null_label)

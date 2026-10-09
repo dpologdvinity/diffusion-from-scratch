@@ -293,3 +293,32 @@ def test_classifier_falls_back_to_bundled_weights(tmp_path, monkeypatch):
     monkeypatch.setattr(clf, "train", lambda dataset: (_ for _ in ()).throw(AssertionError("must not retrain")))
     model = clf.load_or_train("mnist", ckpt_dir=tmp_path)  # empty dir -> bundled models/classifier_mnist.pt
     assert isinstance(model, clf.SmallCNN)
+
+
+def test_disconnected_client_cancels_its_sampling():
+    import asyncio
+    import threading
+
+    from ddpm.sampling import SamplingCancelled
+    from ddpm.serve import run_unless_disconnected
+
+    def work(cancel: threading.Event):
+        assert cancel.wait(5), "work was never cancelled"
+        raise SamplingCancelled
+
+    async def gone():
+        return True
+
+    with pytest.raises(SamplingCancelled):
+        asyncio.run(run_unless_disconnected(work, gone, poll=0.01))
+
+
+def test_connected_client_gets_the_result():
+    import asyncio
+
+    from ddpm.serve import run_unless_disconnected
+
+    async def here():
+        return False
+
+    assert asyncio.run(run_unless_disconnected(lambda cancel: "ok", here, poll=0.01)) == "ok"
