@@ -322,3 +322,17 @@ def test_connected_client_gets_the_result():
         return False
 
     assert asyncio.run(run_unless_disconnected(lambda cancel: "ok", here, poll=0.01)) == "ok"
+
+
+def test_page_results_match_measured_metrics():
+    # Every number in the results section names its source run and must equal the committed result.
+    root = Path(__file__).resolve().parent.parent
+    sources = {"mnist": "results/mnist_metrics.json", "fashion": "results/fashion_metrics.json",
+               "cosine": "results/cosine/mnist_metrics.json", "linear-matched": "results/linear-matched/mnist_metrics.json"}
+    runs = {k: {r["run"]: r for r in json.loads((root / v).read_text())["runs"]} for k, v in sources.items()}
+    html = (WEB / "index.html").read_text()
+    found = re.findall(r'data-metric="([^":]+):([^":]+):(fid|class_acc)">([^<]+)<', html)
+    assert len(found) >= 10
+    for source, run, metric, shown in found:
+        value = runs[source][run][metric]
+        assert shown == (f"{value:.1f}" if metric == "fid" else f"{value:.1%}"), (source, run, metric)

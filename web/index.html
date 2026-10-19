@@ -83,6 +83,36 @@
       </div>
     </section>
 
+    <section id="results" aria-labelledby="results-heading">
+      <h2 id="results-heading">What the experiments show</h2>
+      <p class="hint">FID is measured on 1,000 samples per setting in a small classifier's feature space (lower is better; real images score about 3), so it compares settings within this project, not with published numbers.</p>
+      <ul class="findings">
+        <li><strong>DDIM matches 1000-step DDPM with 20× fewer steps.</strong>
+          On MNIST at guidance 2, 50-step DDIM reaches the same class accuracy
+          (<span data-metric="mnist:ddim50_w2:class_acc">99.9%</span> vs <span data-metric="mnist:ddpm1000_w2:class_acc">99.9%</span>)
+          at a lower FID (<span data-metric="mnist:ddim50_w2:fid">19.0</span> vs <span data-metric="mnist:ddpm1000_w2:fid">28.0</span>),
+          and FashionMNIST agrees (FID <span data-metric="fashion:ddim50_w2:fid">13.8</span> vs <span data-metric="fashion:ddpm1000_w2:fid">24.3</span>).</li>
+        <li><strong>The gap comes from DDPM's injected noise, not its step count.</strong>
+          Turning DDIM's noise (η) up from 0 to 1 at 50 steps moves FID from
+          <span data-metric="mnist:ddim50_w2:fid">19.0</span> to <span data-metric="mnist:ddim50_w2_eta1:fid">30.1</span>, close to DDPM.</li>
+        <li><strong>Guidance trades variety for fidelity.</strong>
+          Guidance 1 gives the best FID (<span data-metric="mnist:ddim50_w1:fid">8.5</span>) at <span data-metric="mnist:ddim50_w1:class_acc">92.7%</span> accuracy;
+          guidance 2 reaches <span data-metric="mnist:ddim50_w2:class_acc">99.9%</span> accuracy at FID <span data-metric="mnist:ddim50_w2:fid">19.0</span>.</li>
+        <li><strong>A cosine noise schedule helps guided sampling but hurts unguided sampling.</strong>
+          Against a linear model trained identically, it cuts 20-step DDIM FID at guidance 2 from
+          <span data-metric="linear-matched:ddim20_w2:fid">17.2</span> to <span data-metric="cosine:ddim20_w2:fid">9.5</span>,
+          but at guidance 1 FID rises from <span data-metric="linear-matched:ddim50_w1:fid">9.5</span> to <span data-metric="cosine:ddim50_w1:fid">18.8</span>.</li>
+      </ul>
+      <figure>
+        <img src="https://raw.githubusercontent.com/dpologdvinity/diffusion-from-scratch/main/results/mnist_steps_tradeoff.png"
+             alt="Two charts: FID and class accuracy against DDIM step count at guidance 2, with DDPM 1000 and real images as reference lines. DDIM stays below DDPM's FID at every step count." loading="lazy" width="1170" height="442">
+        <figcaption>MNIST, guidance 2: DDIM quality across step counts, with 1000-step DDPM and real images for reference.</figcaption>
+      </figure>
+      <p>Full tables, the FashionMNIST results, and the schedule ablation are in the
+        <a href="https://github.com/dpologdvinity/diffusion-from-scratch#results-mnist">README</a>;
+        the math behind each sampler is in <a href="https://github.com/dpologdvinity/diffusion-from-scratch/blob/main/NOTES.md">NOTES.md</a>.</p>
+    </section>
+
     <footer>
       <p><a href="https://github.com/dpologdvinity/diffusion-from-scratch">Source and write-up on GitHub</a>.
         Run it locally with live sampling: clone the repo, then <code>make serve</code>.</p>
