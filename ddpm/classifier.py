@@ -27,9 +27,14 @@ class SmallCNN(nn.Module):
     def __init__(self, num_classes: int = 10):
         super().__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),   # 14x14
-            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),  # 7x7
-            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(1, 16, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),  # 14x14
+            nn.Conv2d(16, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),  # 7x7
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.ReLU(),
         )
         self.fc = nn.Linear(64 * 7 * 7, FEATURE_DIM)
         self.head = nn.Linear(FEATURE_DIM, num_classes)
@@ -43,7 +48,9 @@ class SmallCNN(nn.Module):
 
 
 @torch.no_grad()
-def predict(model: SmallCNN, x: torch.Tensor, batch: int = 1000) -> tuple[torch.Tensor, torch.Tensor]:
+def predict(
+    model: SmallCNN, x: torch.Tensor, batch: int = 1000
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Return (features, predicted labels) for images in [-1, 1]."""
     model.eval()
     feats, preds = [], []
@@ -54,7 +61,9 @@ def predict(model: SmallCNN, x: torch.Tensor, batch: int = 1000) -> tuple[torch.
     return torch.cat(feats), torch.cat(preds)
 
 
-def train(dataset: str, epochs: int = 4, batch: int = 128, seed: int = 0) -> tuple[SmallCNN, float]:
+def train(
+    dataset: str, epochs: int = 4, batch: int = 128, seed: int = 0
+) -> tuple[SmallCNN, float]:
     torch.manual_seed(seed)
     x, y = data.load(dataset, train=True)
     xt, yt = data.load(dataset, train=False)
@@ -66,19 +75,25 @@ def train(dataset: str, epochs: int = 4, batch: int = 128, seed: int = 0) -> tup
         for i in range(0, len(x), batch):
             idx = perm[i : i + batch]
             # Small random shifts make the features less brittle to generator artifacts.
-            xb = torch.roll(x[idx], shifts=tuple(torch.randint(-2, 3, (2,)).tolist()), dims=(2, 3))
+            xb = torch.roll(
+                x[idx], shifts=tuple(torch.randint(-2, 3, (2,)).tolist()), dims=(2, 3)
+            )
             loss = F.cross_entropy(model(xb), y[idx])
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
         acc = (predict(model, xt)[1] == yt).float().mean().item()
-        print(f"  {dataset} classifier epoch {epoch + 1}: test acc {acc:.4f}", flush=True)
+        print(
+            f"  {dataset} classifier epoch {epoch + 1}: test acc {acc:.4f}", flush=True
+        )
     return model, acc
 
 
 def load_or_train(dataset: str, ckpt_dir: Path = Path("checkpoints")) -> SmallCNN:
     path = ckpt_dir / f"classifier_{dataset}.pt"
-    bundled = Path(__file__).resolve().parent.parent / "models" / f"classifier_{dataset}.pt"
+    bundled = (
+        Path(__file__).resolve().parent.parent / "models" / f"classifier_{dataset}.pt"
+    )
     if not path.exists() and bundled.exists():
         path = bundled  # the committed classifier, so every machine scores samples identically
     model = SmallCNN()

@@ -81,7 +81,15 @@ def test_ddim_with_eta_one_equals_ddpm_step(clip):
 def test_samplers_recover_x0_with_oracle_model(sched, method, steps):
     x0 = torch.tensor([[0.3, -0.7]])
     model = OracleModel(sched, x0)
-    out = sample(model, sched, (4, 2), method=method, steps=steps or 0, clip=False, generator=torch.Generator().manual_seed(0))
+    out = sample(
+        model,
+        sched,
+        (4, 2),
+        method=method,
+        steps=steps or 0,
+        clip=False,
+        generator=torch.Generator().manual_seed(0),
+    )
     torch.testing.assert_close(out, x0.expand(4, 2), rtol=0, atol=1e-3)
 
 
@@ -97,11 +105,27 @@ def test_ddim_timesteps_cover_range():
 
 
 def test_ddim_eta_zero_is_deterministic(sched):
-    model = UNet(base_ch=16, ch_mults=(1, 2), num_res_blocks=1, attn_levels=(), num_classes=3)
+    model = UNet(
+        base_ch=16, ch_mults=(1, 2), num_res_blocks=1, attn_levels=(), num_classes=3
+    )
     model.eval()
     y = torch.tensor([0, 1, 2])
-    a = sample(model, sched, (3, 1, 28, 28), y, steps=5, generator=torch.Generator().manual_seed(1))
-    b = sample(model, sched, (3, 1, 28, 28), y, steps=5, generator=torch.Generator().manual_seed(1))
+    a = sample(
+        model,
+        sched,
+        (3, 1, 28, 28),
+        y,
+        steps=5,
+        generator=torch.Generator().manual_seed(1),
+    )
+    b = sample(
+        model,
+        sched,
+        (3, 1, 28, 28),
+        y,
+        steps=5,
+        generator=torch.Generator().manual_seed(1),
+    )
     torch.testing.assert_close(a, b)
 
 
@@ -117,17 +141,28 @@ class LabelEchoModel(torch.nn.Module):
         return y.float().view(-1, 1).expand_as(x)
 
 
-@pytest.mark.parametrize("w,expected", [(0.0, 10.0), (1.0, 3.0), (2.0, -4.0), (3.0, -11.0)])
+@pytest.mark.parametrize(
+    "w,expected", [(0.0, 10.0), (1.0, 3.0), (2.0, -4.0), (3.0, -11.0)]
+)
 def test_guidance_interpolates_and_extrapolates(w, expected):
     x = torch.zeros(2, 1)
-    eps = guided_eps(LabelEchoModel(), x, torch.zeros(2, dtype=torch.long), torch.tensor([3, 3]), w, null_label=10)
+    eps = guided_eps(
+        LabelEchoModel(),
+        x,
+        torch.zeros(2, dtype=torch.long),
+        torch.tensor([3, 3]),
+        w,
+        null_label=10,
+    )
     # eps_u + w (eps_c - eps_u) = 10 + w (3 - 10)
     torch.testing.assert_close(eps, torch.full_like(x, expected))
 
 
 def test_unconditional_sampling_uses_null_label():
     x = torch.zeros(2, 1)
-    eps = guided_eps(LabelEchoModel(), x, torch.zeros(2, dtype=torch.long), None, 5.0, null_label=10)
+    eps = guided_eps(
+        LabelEchoModel(), x, torch.zeros(2, dtype=torch.long), None, 5.0, null_label=10
+    )
     torch.testing.assert_close(eps, torch.full_like(x, 10.0))
 
 
@@ -137,7 +172,9 @@ def test_unconditional_sampling_uses_null_label():
 def test_unet_shapes_and_conditioning():
     torch.manual_seed(0)
     model = UNet(base_ch=16, ch_mults=(1, 2, 4), num_res_blocks=1, num_classes=10)
-    torch.nn.init.normal_(model.out[-1].weight, std=0.1)  # undo zero init so outputs differ
+    torch.nn.init.normal_(
+        model.out[-1].weight, std=0.1
+    )  # undo zero init so outputs differ
     x = torch.randn(4, 1, 28, 28)
     t = torch.tensor([0, 10, 500, 999])
     out = model(x, t, torch.tensor([0, 1, 2, 10]))  # 10 = null label
@@ -174,14 +211,25 @@ def test_run_names_and_shard_merging(tmp_path, monkeypatch):
 
     assert ev.run_name("ddpm", 1000, 2.0) == "ddpm1000_w2"
     assert ev.run_name("ddim", 50, 0.0, eta=1.0) == "ddim50_w0_eta1"
-    assert ev.run_name("ddpm", 1000, 2.0, eta=1.0) == "ddpm1000_w2"  # eta only applies to DDIM
+    assert (
+        ev.run_name("ddpm", 1000, 2.0, eta=1.0) == "ddpm1000_w2"
+    )  # eta only applies to DDIM
 
     monkeypatch.setattr(ev, "RESULTS", tmp_path)
     d = ev.runs_dir("mnist")
     d.mkdir(parents=True)
     for i in range(2):
-        torch.save({"x": torch.full((3, 1, 2, 2), float(i)), "y": torch.full((3,), i), "method": "ddim", "steps": 50,
-                    "guidance": 2.0, "seconds": 1.5}, d / f"ddim50_w2.part{i}of2.pt")
+        torch.save(
+            {
+                "x": torch.full((3, 1, 2, 2), float(i)),
+                "y": torch.full((3,), i),
+                "method": "ddim",
+                "steps": 50,
+                "guidance": 2.0,
+                "seconds": 1.5,
+            },
+            d / f"ddim50_w2.part{i}of2.pt",
+        )
     runs = ev.load_runs("mnist")
     assert list(runs) == ["ddim50_w2"]
     assert runs["ddim50_w2"]["x"].shape[0] == 6 and runs["ddim50_w2"]["seconds"] == 3.0
@@ -191,8 +239,14 @@ def test_results_dir_flag_redirects_all_outputs(tmp_path, monkeypatch):
     import ddpm.evaluate as ev
 
     seen = {}
-    monkeypatch.setattr(ev, "cmd_report", lambda args: seen.update(results=ev.RESULTS, runs=ev.runs_dir(args.dataset)))
-    monkeypatch.setattr("sys.argv", ["evaluate", "report", "--results-dir", str(tmp_path / "cosine")])
+    monkeypatch.setattr(
+        ev,
+        "cmd_report",
+        lambda args: seen.update(results=ev.RESULTS, runs=ev.runs_dir(args.dataset)),
+    )
+    monkeypatch.setattr(
+        "sys.argv", ["evaluate", "report", "--results-dir", str(tmp_path / "cosine")]
+    )
     ev.main()
     assert seen["results"] == tmp_path / "cosine"
     assert seen["runs"] == tmp_path / "cosine" / "runs" / "mnist"
@@ -205,15 +259,27 @@ def test_resolve_device():
     from ddpm.train import resolve_device
 
     assert resolve_device("cpu") == torch.device("cpu")
-    assert resolve_device("auto") == torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    assert resolve_device("auto") == torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
 
 
 def test_sampling_noise_comes_from_the_cpu_generator(sched):
     # GPU runs must start from the same noise as CPU runs, so noise is drawn on the CPU generator.
     x0 = torch.tensor([[0.3, -0.7]])
     model = OracleModel(sched, x0)
-    a = sample(model, sched, (2, 2), method="ddim", steps=5, eta=1.0, clip=False, generator=torch.Generator().manual_seed(4),
-               device="cpu", return_trajectory=True)[1][0]
+    a = sample(
+        model,
+        sched,
+        (2, 2),
+        method="ddim",
+        steps=5,
+        eta=1.0,
+        clip=False,
+        generator=torch.Generator().manual_seed(4),
+        device="cpu",
+        return_trajectory=True,
+    )[1][0]
     b = torch.randn((2, 2), generator=torch.Generator().manual_seed(4))
     torch.testing.assert_close(a, b)
 
@@ -230,4 +296,6 @@ def test_sampling_stops_when_cancelled(sched):
     model = OracleModel(sched, torch.tensor([[0.3, -0.7]]))
     with pytest.raises(SamplingCancelled):
         sample(model, sched, (1, 2), method="ddpm", clip=False, cancel=cancel)
-    assert len(calls) == 4  # stopped at the first check that said so, not after 1000 steps
+    assert (
+        len(calls) == 4
+    )  # stopped at the first check that said so, not after 1000 steps

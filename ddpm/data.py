@@ -8,11 +8,24 @@ from torchvision import datasets
 
 DATASETS = {"mnist": datasets.MNIST, "fashion": datasets.FashionMNIST}
 
-FASHION_CLASSES = ["T-shirt", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Boot"]
+FASHION_CLASSES = [
+    "T-shirt",
+    "Trouser",
+    "Pullover",
+    "Dress",
+    "Coat",
+    "Sandal",
+    "Shirt",
+    "Sneaker",
+    "Bag",
+    "Boot",
+]
 CLASS_NAMES = {"mnist": [str(i) for i in range(10)], "fashion": FASHION_CLASSES}
 
 
-def load(name: str, train: bool = True, root: str = "data") -> tuple[torch.Tensor, torch.Tensor]:
+def load(
+    name: str, train: bool = True, root: str = "data"
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Return images scaled to [-1, 1] with shape (N, 1, 28, 28), and integer labels (N,)."""
     ds = DATASETS[name](root, train=train, download=True)
     x = ds.data.float().div(127.5).sub(1).unsqueeze(1)

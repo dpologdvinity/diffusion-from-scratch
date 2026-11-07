@@ -13,8 +13,12 @@ from ddpm.unet import UNet
 
 def tiny_model():
     torch.manual_seed(0)
-    model = UNet(base_ch=8, ch_mults=(1, 2), num_res_blocks=1, attn_levels=(), num_classes=10).eval()
-    torch.nn.init.normal_(model.out[-1].weight, std=0.1)  # undo zero init so samples vary
+    model = UNet(
+        base_ch=8, ch_mults=(1, 2), num_res_blocks=1, attn_levels=(), num_classes=10
+    ).eval()
+    torch.nn.init.normal_(
+        model.out[-1].weight, std=0.1
+    )  # undo zero init so samples vary
     return model
 
 
@@ -34,7 +38,17 @@ def sched():
 def test_sample_frames_shapes_and_endpoints(model, sched):
     from ddpm.render import sample_frames
 
-    final, frames = sample_frames(model, sched, torch.tensor([3, 7]), guidance=2.0, sampler="ddim", steps=10, eta=0.0, seed=1, frames=4)
+    final, frames = sample_frames(
+        model,
+        sched,
+        torch.tensor([3, 7]),
+        guidance=2.0,
+        sampler="ddim",
+        steps=10,
+        eta=0.0,
+        seed=1,
+        frames=4,
+    )
     assert final.shape == (2, 1, 28, 28)
     assert len(frames) == 4
     assert all(f.shape == (2, 1, 28, 28) for f in frames)
@@ -44,7 +58,17 @@ def test_sample_frames_shapes_and_endpoints(model, sched):
 def test_sample_frames_clamps_to_trajectory_length(model, sched):
     from ddpm.render import sample_frames
 
-    _, frames = sample_frames(model, sched, torch.tensor([0]), guidance=1.0, sampler="ddim", steps=10, eta=0.0, seed=0, frames=50)
+    _, frames = sample_frames(
+        model,
+        sched,
+        torch.tensor([0]),
+        guidance=1.0,
+        sampler="ddim",
+        steps=10,
+        eta=0.0,
+        seed=0,
+        frames=50,
+    )
     assert len(frames) == 11  # x_T plus one state per DDIM step
 
 
@@ -82,14 +106,27 @@ def test_export_writes_consistent_manifest(model, tmp_path):
     (web_dir / "index.html").write_text("<!doctype html>")
     out = tmp_path / "docs"
     labels = [f"class {i}" for i in range(10)]
-    manifest = export(model, NoiseSchedule(50), out, web_dir, guidances=(0, 2), steps=(5,), traj_frames=3,
-                      model_info={"train_steps": 1, "params": 2}, labels=labels)
+    manifest = export(
+        model,
+        NoiseSchedule(50),
+        out,
+        web_dir,
+        guidances=(0, 2),
+        steps=(5,),
+        traj_frames=3,
+        model_info={"train_steps": 1, "params": 2},
+        labels=labels,
+    )
 
     assert (out / "index.html").exists()
     assert json.loads((out / "manifest.json").read_text()) == manifest
     assert set(manifest["grid"]) == {"w0_s5", "w2_s5"}
     assert manifest["ddpm"]["sprite"] and len(manifest["trajectory"]["frames"]) == 3
-    sprites = list(manifest["grid"].values()) + [manifest["ddpm"]["sprite"]] + manifest["trajectory"]["frames"]
+    sprites = (
+        list(manifest["grid"].values())
+        + [manifest["ddpm"]["sprite"]]
+        + manifest["trajectory"]["frames"]
+    )
     for rel in sprites:
         assert not rel.startswith("/")
         assert Image.open(out / rel).size == (280, 28)
@@ -101,7 +138,16 @@ def test_export_without_web_dir_writes_only_assets(model, tmp_path):
     from ddpm.export_web import export
 
     out = tmp_path / "docs" / "fashion"
-    export(model, NoiseSchedule(50), out, None, guidances=(2,), steps=(5,), traj_frames=2, labels=list("abcdefghij"))
+    export(
+        model,
+        NoiseSchedule(50),
+        out,
+        None,
+        guidances=(2,),
+        steps=(5,),
+        traj_frames=2,
+        labels=list("abcdefghij"),
+    )
     assert (out / "manifest.json").exists() and not (out / "index.html").exists()
 
 
@@ -122,20 +168,29 @@ def client(model, tmp_path):
     (assets / "manifest.json").write_text('{"grid": {}}')
     (assets / "fashion").mkdir()
     (assets / "fashion" / "manifest.json").write_text('{"grid": {"f": 1}}')
-    models = {"mnist": (model, NoiseSchedule(50), {"train_steps": 3, "params": 4}),
-              "fashion": (model, NoiseSchedule(50), {"train_steps": 5, "params": 4})}
+    models = {
+        "mnist": (model, NoiseSchedule(50), {"train_steps": 3, "params": 4}),
+        "fashion": (model, NoiseSchedule(50), {"train_steps": 5, "params": 4}),
+    }
     return TestClient(create_app(models, web_dir, assets))
 
 
 def test_health_reports_model(client):
     r = client.get("/api/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "datasets": {"mnist": {"train_steps": 3, "params": 4},
-                                                     "fashion": {"train_steps": 5, "params": 4}}}
+    assert r.json() == {
+        "status": "ok",
+        "datasets": {
+            "mnist": {"train_steps": 3, "params": 4},
+            "fashion": {"train_steps": 5, "params": 4},
+        },
+    }
 
 
 def test_sample_returns_frames(client):
-    r = client.post("/api/sample", json={"dataset": "fashion", "label": 4, "steps": 5, "frames": 4})
+    r = client.post(
+        "/api/sample", json={"dataset": "fashion", "label": 4, "steps": 5, "frames": 4}
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["image"].startswith("data:image/png;base64,")
@@ -143,8 +198,17 @@ def test_sample_returns_frames(client):
     assert all(f.startswith("data:image/png;base64,") for f in body["frames"])
 
 
-@pytest.mark.parametrize("payload", [{"label": 10}, {"steps": 0}, {"sampler": "x"}, {"frames": 1}, {"eta": 2},
-                                     {"dataset": "cifar"}])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"label": 10},
+        {"steps": 0},
+        {"sampler": "x"},
+        {"frames": 1},
+        {"eta": 2},
+        {"dataset": "cifar"},
+    ],
+)
 def test_invalid_requests_rejected(client, payload):
     assert client.post("/api/sample", json=payload).status_code == 422
 
@@ -155,7 +219,9 @@ def test_dataset_without_weights_is_rejected(model, tmp_path):
     from ddpm.serve import create_app
 
     (tmp_path / "index.html").write_text("x")
-    client = TestClient(create_app({"mnist": (model, NoiseSchedule(50), {})}, tmp_path, None))
+    client = TestClient(
+        create_app({"mnist": (model, NoiseSchedule(50), {})}, tmp_path, None)
+    )
     r = client.post("/api/sample", json={"dataset": "fashion"})
     assert r.status_code == 422
     assert r.json()["detail"][0]["loc"][-1] == "dataset"
@@ -184,8 +250,14 @@ def test_requests_are_serialized(client, monkeypatch):
         return real(*args, **kwargs)
 
     monkeypatch.setattr(serve, "sample_frames", slow)
-    threads = [threading.Thread(target=client.post, args=("/api/sample",), kwargs={"json": {"steps": 2, "frames": 2}})
-               for _ in range(2)]
+    threads = [
+        threading.Thread(
+            target=client.post,
+            args=("/api/sample",),
+            kwargs={"json": {"steps": 2, "frames": 2}},
+        )
+        for _ in range(2)
+    ]
     for t in threads:
         t.start()
     for t in threads:
@@ -216,13 +288,23 @@ def test_page_uses_relative_urls():
     # GitHub Pages serves the site under /diffusion-from-scratch/, so absolute paths would break.
     for f in ("index.html", "app.js", "style.css"):
         text = (WEB / f).read_text()
-        for absolute in ('src="/', "href=\"/", 'fetch("/', "fetch('/", "url(/"):
+        for absolute in ('src="/', 'href="/', 'fetch("/', "fetch('/", "url(/"):
             assert absolute not in text, f"{f} contains {absolute}"
 
 
 def test_page_has_required_controls():
     html = (WEB / "index.html").read_text()
-    for el_id in ("dataset", "static-view", "guidance", "steps", "digits", "play", "live-view", "live-label", "status"):
+    for el_id in (
+        "dataset",
+        "static-view",
+        "guidance",
+        "steps",
+        "digits",
+        "play",
+        "live-view",
+        "live-label",
+        "status",
+    ):
         assert f'id="{el_id}"' in html, el_id
     for input_id in re.findall(r'<input[^>]*\bid="([^"]+)"', html):
         assert f'for="{input_id}"' in html, f"input #{input_id} has no label"
@@ -237,7 +319,9 @@ def test_live_result_hidden_until_generated():
 def test_live_progress_is_announced_outside_hidden_result():
     html = (WEB / "index.html").read_text()
     output = re.search(r'<div class="live-output".*?</div>', html, re.S).group(0)
-    assert 'id="live-meta"' not in output, "progress text must stay visible before the first result"
+    assert 'id="live-meta"' not in output, (
+        "progress text must stay visible before the first result"
+    )
     assert re.search(r'<p id="live-meta"[^>]*role="status"', html)
 
 
@@ -248,15 +332,27 @@ def test_export_ema_writes_inference_only_checkpoint(model, tmp_path):
     from ddpm.train import export_ema, load_ema_model
 
     src = tmp_path / "full.pt"
-    torch.save({"model": model.state_dict(), "ema": model.state_dict(), "opt": {"big": torch.zeros(10)}, "step": 7,
-                "unet_config": model.config, "schedule": {"T": 50, "kind": "linear"}, "history": [1, 2]}, src)
+    torch.save(
+        {
+            "model": model.state_dict(),
+            "ema": model.state_dict(),
+            "opt": {"big": torch.zeros(10)},
+            "step": 7,
+            "unet_config": model.config,
+            "schedule": {"T": 50, "kind": "linear"},
+            "history": [1, 2],
+        },
+        src,
+    )
     dst = tmp_path / "models" / "slim.pt"
     export_ema(src, dst)
     slim = torch.load(dst, weights_only=False)
     assert set(slim) == {"ema", "unet_config", "schedule", "step"}
     loaded, sched, ckpt = load_ema_model(dst)
     assert sched.T == 50 and ckpt["step"] == 7
-    torch.testing.assert_close(loaded.state_dict()["out.2.weight"], model.state_dict()["out.2.weight"])
+    torch.testing.assert_close(
+        loaded.state_dict()["out.2.weight"], model.state_dict()["out.2.weight"]
+    )
 
 
 def test_default_checkpoint_prefers_trained_then_bundled(tmp_path):
@@ -267,7 +363,10 @@ def test_default_checkpoint_prefers_trained_then_bundled(tmp_path):
     assert default_checkpoint(tmp_path, "fashion") == tmp_path / "models" / "fashion.pt"
     (tmp_path / "checkpoints").mkdir()
     (tmp_path / "checkpoints" / "fashion.pt").write_bytes(b"x")
-    assert default_checkpoint(tmp_path, "fashion") == tmp_path / "checkpoints" / "fashion.pt"
+    assert (
+        default_checkpoint(tmp_path, "fashion")
+        == tmp_path / "checkpoints" / "fashion.pt"
+    )
 
 
 @pytest.mark.parametrize("dataset", ["mnist", "fashion"])
@@ -290,8 +389,14 @@ def test_export_missing_checkpoint_message():
 def test_classifier_falls_back_to_bundled_weights(tmp_path, monkeypatch):
     import ddpm.classifier as clf
 
-    monkeypatch.setattr(clf, "train", lambda dataset: (_ for _ in ()).throw(AssertionError("must not retrain")))
-    model = clf.load_or_train("mnist", ckpt_dir=tmp_path)  # empty dir -> bundled models/classifier_mnist.pt
+    monkeypatch.setattr(
+        clf,
+        "train",
+        lambda dataset: (_ for _ in ()).throw(AssertionError("must not retrain")),
+    )
+    model = clf.load_or_train(
+        "mnist", ckpt_dir=tmp_path
+    )  # empty dir -> bundled models/classifier_mnist.pt
     assert isinstance(model, clf.SmallCNN)
 
 
@@ -321,18 +426,34 @@ def test_connected_client_gets_the_result():
     async def here():
         return False
 
-    assert asyncio.run(run_unless_disconnected(lambda cancel: "ok", here, poll=0.01)) == "ok"
+    assert (
+        asyncio.run(run_unless_disconnected(lambda cancel: "ok", here, poll=0.01))
+        == "ok"
+    )
 
 
 def test_page_results_match_measured_metrics():
     # Every number in the results section names its source run and must equal the committed result.
     root = Path(__file__).resolve().parent.parent
-    sources = {"mnist": "results/mnist_metrics.json", "fashion": "results/fashion_metrics.json",
-               "cosine": "results/cosine/mnist_metrics.json", "linear-matched": "results/linear-matched/mnist_metrics.json"}
-    runs = {k: {r["run"]: r for r in json.loads((root / v).read_text())["runs"]} for k, v in sources.items()}
+    sources = {
+        "mnist": "results/mnist_metrics.json",
+        "fashion": "results/fashion_metrics.json",
+        "cosine": "results/cosine/mnist_metrics.json",
+        "linear-matched": "results/linear-matched/mnist_metrics.json",
+    }
+    runs = {
+        k: {r["run"]: r for r in json.loads((root / v).read_text())["runs"]}
+        for k, v in sources.items()
+    }
     html = (WEB / "index.html").read_text()
-    found = re.findall(r'data-metric="([^":]+):([^":]+):(fid|class_acc)">([^<]+)<', html)
+    found = re.findall(
+        r'data-metric="([^":]+):([^":]+):(fid|class_acc)">([^<]+)<', html
+    )
     assert len(found) >= 10
     for source, run, metric, shown in found:
         value = runs[source][run][metric]
-        assert shown == (f"{value:.1f}" if metric == "fid" else f"{value:.1%}"), (source, run, metric)
+        assert shown == (f"{value:.1f}" if metric == "fid" else f"{value:.1%}"), (
+            source,
+            run,
+            metric,
+        )

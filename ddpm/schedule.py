@@ -19,7 +19,9 @@ import math
 import torch
 
 
-def linear_betas(T: int, beta_start: float = 1e-4, beta_end: float = 0.02) -> torch.Tensor:
+def linear_betas(
+    T: int, beta_start: float = 1e-4, beta_end: float = 0.02
+) -> torch.Tensor:
     """Linear schedule from the original DDPM paper."""
     return torch.linspace(beta_start, beta_end, T, dtype=torch.float64)
 
@@ -38,7 +40,9 @@ def extract(v: torch.Tensor, t: torch.Tensor, ndim: int) -> torch.Tensor:
 
 
 class NoiseSchedule:
-    def __init__(self, T: int = 1000, kind: str = "linear", dtype: torch.dtype = torch.float32):
+    def __init__(
+        self, T: int = 1000, kind: str = "linear", dtype: torch.dtype = torch.float32
+    ):
         if kind == "linear":
             betas = linear_betas(T)
         elif kind == "cosine":
@@ -57,7 +61,9 @@ class NoiseSchedule:
         ab = self.alpha_bar.to(t.device)[t.clamp(min=0)]
         return torch.where(t >= 0, ab, torch.ones_like(ab))
 
-    def q_sample(self, x0: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
+    def q_sample(
+        self, x0: torch.Tensor, t: torch.Tensor, noise: torch.Tensor
+    ) -> torch.Tensor:
         """Sample x_t ~ q(x_t | x_0) using the closed form."""
         ab = extract(self.alpha_bar, t, x0.dim())
         return ab.sqrt() * x0 + (1 - ab).sqrt() * noise

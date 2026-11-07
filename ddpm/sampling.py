@@ -34,7 +34,9 @@ def guided_eps(model, x, t, y, guidance: float, null_label: int) -> torch.Tensor
     if guidance == 1.0:
         return model(x, t, y)
     null = torch.full_like(y, null_label)
-    eps_c, eps_u = model(torch.cat([x, x]), torch.cat([t, t]), torch.cat([y, null])).chunk(2)
+    eps_c, eps_u = model(
+        torch.cat([x, x]), torch.cat([t, t]), torch.cat([y, null])
+    ).chunk(2)
     return eps_u + guidance * (eps_c - eps_u)
 
 
@@ -44,12 +46,14 @@ def predict_x0(sched: NoiseSchedule, x_t, t, eps, clip: bool) -> torch.Tensor:
     return x0.clamp(-1, 1) if clip else x0
 
 
-def ddpm_step(sched: NoiseSchedule, x_t, t, eps, noise, clip: bool = True) -> torch.Tensor:
+def ddpm_step(
+    sched: NoiseSchedule, x_t, t, eps, noise, clip: bool = True
+) -> torch.Tensor:
     """One ancestral step x_t -> x_{t-1}, sampling from the true posterior q(x_{t-1} | x_t, x0_hat).
 
-        mean = sqrt(ab_{t-1}) beta_t / (1 - ab_t) * x0_hat
-             + sqrt(alpha_t) (1 - ab_{t-1}) / (1 - ab_t) * x_t
-        var  = beta_tilde_t = (1 - ab_{t-1}) / (1 - ab_t) * beta_t
+    mean = sqrt(ab_{t-1}) beta_t / (1 - ab_t) * x0_hat
+         + sqrt(alpha_t) (1 - ab_{t-1}) / (1 - ab_t) * x_t
+    var  = beta_tilde_t = (1 - ab_{t-1}) / (1 - ab_t) * beta_t
     """
     nd = x_t.dim()
     x0 = predict_x0(sched, x_t, t, eps, clip)
@@ -58,12 +62,23 @@ def ddpm_step(sched: NoiseSchedule, x_t, t, eps, noise, clip: bool = True) -> to
     beta_t = extract(sched.betas, t, nd)
     alpha_t = extract(sched.alphas, t, nd)
 
-    mean = (ab_prev.sqrt() * beta_t / (1 - ab_t)) * x0 + (alpha_t.sqrt() * (1 - ab_prev) / (1 - ab_t)) * x_t
+    mean = (ab_prev.sqrt() * beta_t / (1 - ab_t)) * x0 + (
+        alpha_t.sqrt() * (1 - ab_prev) / (1 - ab_t)
+    ) * x_t
     var = (1 - ab_prev) / (1 - ab_t) * beta_t
     return mean + var.sqrt() * noise
 
 
-def ddim_step(sched: NoiseSchedule, x_t, t, t_prev, eps, noise, eta: float = 0.0, clip: bool = True) -> torch.Tensor:
+def ddim_step(
+    sched: NoiseSchedule,
+    x_t,
+    t,
+    t_prev,
+    eps,
+    noise,
+    eta: float = 0.0,
+    clip: bool = True,
+) -> torch.Tensor:
     """One DDIM step x_t -> x_{t_prev} for any t_prev < t (Song et al. 2021, eq. 12).
 
         x_prev = sqrt(ab_prev) * x0_hat                      # "predicted x0"
@@ -82,7 +97,11 @@ def ddim_step(sched: NoiseSchedule, x_t, t, t_prev, eps, noise, eta: float = 0.0
     eps = (x_t - ab_t.sqrt() * x0) / (1 - ab_t).sqrt()
 
     sigma = eta * ((1 - ab_prev) / (1 - ab_t) * (1 - ab_t / ab_prev)).sqrt()
-    return ab_prev.sqrt() * x0 + (1 - ab_prev - sigma**2).clamp(min=0).sqrt() * eps + sigma * noise
+    return (
+        ab_prev.sqrt() * x0
+        + (1 - ab_prev - sigma**2).clamp(min=0).sqrt() * eps
+        + sigma * noise
+    )
 
 
 def ddim_timesteps(T: int, steps: int) -> list[int]:

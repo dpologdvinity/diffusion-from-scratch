@@ -85,7 +85,16 @@ def save_preview(ema, sched, path: Path, num_classes: int, guidance: float):
     ema.eval()
     y = torch.arange(num_classes)
     g = torch.Generator().manual_seed(0)
-    x = sample(ema, sched, (len(y), 1, 28, 28), y, method="ddim", steps=20, guidance=guidance, generator=g)
+    x = sample(
+        ema,
+        sched,
+        (len(y), 1, 28, 28),
+        y,
+        method="ddim",
+        steps=20,
+        guidance=guidance,
+        generator=g,
+    )
     save_image(data.to_unit(x), path, nrow=num_classes)
 
 
@@ -93,20 +102,36 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--dataset", choices=list(data.DATASETS), default="mnist")
     p.add_argument("--steps", type=int, default=20000)
-    p.add_argument("--minutes", type=float, default=0, help="stop after this much wall-clock time (0 = no limit)")
+    p.add_argument(
+        "--minutes",
+        type=float,
+        default=0,
+        help="stop after this much wall-clock time (0 = no limit)",
+    )
     p.add_argument("--batch-size", type=int, default=64, help="per worker")
     p.add_argument("--lr", type=float, default=2e-4)
     p.add_argument("--warmup", type=int, default=500)
     p.add_argument("--ema-decay", type=float, default=0.999)
-    p.add_argument("--p-uncond", type=float, default=0.1, help="label dropout probability for CFG")
+    p.add_argument(
+        "--p-uncond", type=float, default=0.1, help="label dropout probability for CFG"
+    )
     p.add_argument("--T", type=int, default=1000)
     p.add_argument("--schedule", choices=["linear", "cosine"], default="linear")
     p.add_argument("--base-ch", type=int, default=16)
     p.add_argument("--ch-mults", type=int, nargs="+", default=[1, 2, 3])
     p.add_argument("--num-res-blocks", type=int, default=1)
     p.add_argument("--dropout", type=float, default=0.1)
-    p.add_argument("--threads", type=int, default=0, help="torch CPU threads per worker (0 = default)")
-    p.add_argument("--device", default="cpu", help="cpu, cuda, or auto (single-process only for GPUs)")
+    p.add_argument(
+        "--threads",
+        type=int,
+        default=0,
+        help="torch CPU threads per worker (0 = default)",
+    )
+    p.add_argument(
+        "--device",
+        default="cpu",
+        help="cpu, cuda, or auto (single-process only for GPUs)",
+    )
     p.add_argument("--log-every", type=int, default=100)
     p.add_argument("--ckpt-every", type=int, default=1000)
     p.add_argument("--preview-every", type=int, default=500)
@@ -122,7 +147,9 @@ def main():
     main_proc = rank == 0
     if args.threads:
         torch.set_num_threads(args.threads)
-    torch.manual_seed(args.seed)  # identical init on every worker (DDP also broadcasts rank 0's weights)
+    torch.manual_seed(
+        args.seed
+    )  # identical init on every worker (DDP also broadcasts rank 0's weights)
 
     device = resolve_device(args.device)
     x_all, y_all = data.load(args.dataset, train=True)
@@ -131,8 +158,11 @@ def main():
     sched = NoiseSchedule(args.T, args.schedule)
 
     model = UNet(
-        base_ch=args.base_ch, ch_mults=tuple(args.ch_mults), num_res_blocks=args.num_res_blocks,
-        num_classes=num_classes, dropout=args.dropout,
+        base_ch=args.base_ch,
+        ch_mults=tuple(args.ch_mults),
+        num_res_blocks=args.num_res_blocks,
+        num_classes=num_classes,
+        dropout=args.dropout,
     ).to(device)
     ema = copy.deepcopy(model).requires_grad_(False)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.0)
@@ -151,7 +181,9 @@ def main():
             print(f"resumed from step {step}")
 
     net = DistributedDataParallel(model) if world > 1 else model
-    torch.manual_seed(args.seed + 1000 * rank + step)  # different batches and noise per worker
+    torch.manual_seed(
+        args.seed + 1000 * rank + step
+    )  # different batches and noise per worker
 
     n_params = sum(p.numel() for p in model.parameters())
     if main_proc:
@@ -174,7 +206,11 @@ def main():
     while not should_stop():
         idx = torch.randint(0, len(x_all), (args.batch_size,), device=device)
         x0, y = x_all[idx], y_all[idx]
-        y = torch.where(torch.rand(y.shape, device=device) < args.p_uncond, torch.full_like(y, num_classes), y)
+        y = torch.where(
+            torch.rand(y.shape, device=device) < args.p_uncond,
+            torch.full_like(y, num_classes),
+            y,
+        )
 
         t = torch.randint(0, sched.T, (args.batch_size,), device=device)
         noise = torch.randn_like(x0)
@@ -196,22 +232,45 @@ def main():
         update_ema(ema, model, min(args.ema_decay, (1 + step) / (10 + step)))
         if step % args.log_every == 0:
             elapsed = time.monotonic() - t0
-            rec = {"step": step, "loss": running / args.log_every, "lr": lr, "sec": round(elapsed, 1)}
+            rec = {
+                "step": step,
+                "loss": running / args.log_every,
+                "lr": lr,
+                "sec": round(elapsed, 1),
+            }
             history.append(rec)
             with open(log_path, "a") as f:
                 f.write(json.dumps(rec) + "\n")
-            print(f"step {step:6d}  loss {rec['loss']:.4f}  {elapsed / 60:6.1f} min  {elapsed / (step - start_step):.2f} s/step", flush=True)
+            print(
+                f"step {step:6d}  loss {rec['loss']:.4f}  {elapsed / 60:6.1f} min  {elapsed / (step - start_step):.2f} s/step",
+                flush=True,
+            )
             running = 0.0
         if step % args.ckpt_every == 0:
             save_checkpoint(ckpt_path, model, ema, opt, step, args, history)
         if args.preview_every and step % args.preview_every == 0:
-            save_preview(ema, sched, args.out / f"{args.dataset}_preview_{step:06d}.png", num_classes, guidance=3.0)
+            save_preview(
+                ema,
+                sched,
+                args.out / f"{args.dataset}_preview_{step:06d}.png",
+                num_classes,
+                guidance=3.0,
+            )
             model.train()
 
     if main_proc:
         save_checkpoint(ckpt_path, model, ema, opt, step, args, history)
-        save_preview(ema, sched, args.out / f"{args.dataset}_preview_{step:06d}.png", num_classes, guidance=3.0)
-        print(f"done: {step} steps in {(time.monotonic() - t0) / 60:.1f} min -> {ckpt_path}", flush=True)
+        save_preview(
+            ema,
+            sched,
+            args.out / f"{args.dataset}_preview_{step:06d}.png",
+            num_classes,
+            guidance=3.0,
+        )
+        print(
+            f"done: {step} steps in {(time.monotonic() - t0) / 60:.1f} min -> {ckpt_path}",
+            flush=True,
+        )
     if world > 1:
         dist.destroy_process_group()
 

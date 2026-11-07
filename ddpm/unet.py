@@ -15,16 +15,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def timestep_embedding(t: torch.Tensor, dim: int, max_period: float = 10000.0) -> torch.Tensor:
+def timestep_embedding(
+    t: torch.Tensor, dim: int, max_period: float = 10000.0
+) -> torch.Tensor:
     """Transformer-style sinusoidal embedding of integer timesteps."""
     half = dim // 2
-    freqs = torch.exp(-math.log(max_period) * torch.arange(half, dtype=torch.float32, device=t.device) / half)
+    freqs = torch.exp(
+        -math.log(max_period)
+        * torch.arange(half, dtype=torch.float32, device=t.device)
+        / half
+    )
     args = t.float()[:, None] * freqs[None]
     return torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_ch: int, out_ch: int, emb_dim: int, dropout: float, groups: int = 8):
+    def __init__(
+        self, in_ch: int, out_ch: int, emb_dim: int, dropout: float, groups: int = 8
+    ):
         super().__init__()
         self.norm1 = nn.GroupNorm(groups, in_ch)
         self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding=1)
@@ -69,14 +77,21 @@ class UNet(nn.Module):
     ):
         super().__init__()
         self.config = dict(
-            in_ch=in_ch, base_ch=base_ch, ch_mults=tuple(ch_mults), num_res_blocks=num_res_blocks,
-            attn_levels=tuple(attn_levels), num_classes=num_classes, dropout=dropout,
+            in_ch=in_ch,
+            base_ch=base_ch,
+            ch_mults=tuple(ch_mults),
+            num_res_blocks=num_res_blocks,
+            attn_levels=tuple(attn_levels),
+            num_classes=num_classes,
+            dropout=dropout,
         )
         self.num_classes = num_classes
         self.base_ch = base_ch
         emb_dim = base_ch * 4
 
-        self.time_mlp = nn.Sequential(nn.Linear(base_ch, emb_dim), nn.SiLU(), nn.Linear(emb_dim, emb_dim))
+        self.time_mlp = nn.Sequential(
+            nn.Linear(base_ch, emb_dim), nn.SiLU(), nn.Linear(emb_dim, emb_dim)
+        )
         self.class_emb = nn.Embedding(num_classes + 1, emb_dim)
 
         self.in_conv = nn.Conv2d(in_ch, base_ch, 3, padding=1)
@@ -95,17 +110,27 @@ class UNet(nn.Module):
                 ch = out_ch
                 skip_chs.append(ch)
             if level != len(ch_mults) - 1:
-                self.down.append(nn.ModuleList([nn.Conv2d(ch, ch, 3, stride=2, padding=1)]))
+                self.down.append(
+                    nn.ModuleList([nn.Conv2d(ch, ch, 3, stride=2, padding=1)])
+                )
                 skip_chs.append(ch)
 
-        self.mid = nn.ModuleList([ResBlock(ch, ch, emb_dim, dropout), SelfAttention(ch), ResBlock(ch, ch, emb_dim, dropout)])
+        self.mid = nn.ModuleList(
+            [
+                ResBlock(ch, ch, emb_dim, dropout),
+                SelfAttention(ch),
+                ResBlock(ch, ch, emb_dim, dropout),
+            ]
+        )
 
         # Decoder: one extra block per level to consume the downsample skip.
         self.up = nn.ModuleList()
         for level, mult in reversed(list(enumerate(ch_mults))):
             out_ch = base_ch * mult
             for _ in range(num_res_blocks + 1):
-                block = nn.ModuleList([ResBlock(ch + skip_chs.pop(), out_ch, emb_dim, dropout)])
+                block = nn.ModuleList(
+                    [ResBlock(ch + skip_chs.pop(), out_ch, emb_dim, dropout)]
+                )
                 if level in attn_levels:
                     block.append(SelfAttention(out_ch))
                 self.up.append(block)
@@ -113,14 +138,20 @@ class UNet(nn.Module):
             if level != 0:
                 # No conv after upsampling: the next ResBlock convolves the upsampled map anyway,
                 # and a full-resolution conv here would cost ~20% of the network's FLOPs.
-                self.up.append(nn.ModuleList([nn.Upsample(scale_factor=2, mode="nearest")]))
+                self.up.append(
+                    nn.ModuleList([nn.Upsample(scale_factor=2, mode="nearest")])
+                )
 
-        self.out = nn.Sequential(nn.GroupNorm(8, ch), nn.SiLU(), nn.Conv2d(ch, in_ch, 3, padding=1))
+        self.out = nn.Sequential(
+            nn.GroupNorm(8, ch), nn.SiLU(), nn.Conv2d(ch, in_ch, 3, padding=1)
+        )
         # Start as a zero predictor so early training is stable.
         nn.init.zeros_(self.out[-1].weight)
         nn.init.zeros_(self.out[-1].bias)
 
-    def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, t: torch.Tensor, y: torch.Tensor
+    ) -> torch.Tensor:
         emb = self.time_mlp(timestep_embedding(t, self.base_ch)) + self.class_emb(y)
 
         h = self.in_conv(x)
