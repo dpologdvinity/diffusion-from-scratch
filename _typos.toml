@@ -1,0 +1,15 @@
+# typos config: https://github.com/crate-ci/typos
+[files]
+extend-exclude = [
+  "*.{gif,png,jpg,jpeg,webp,ico,svg,pdf,woff,woff2,ttf}",
+]
+
+[default.extend-words]
+# `nd` is the local variable for a tensor's number of dimensions (sampling.py).
+"nd" = "nd"
+
+[default.extend-identifiers]
+# Shard filename pattern "name.partIofK.pt" (part I of K).
+"partIofK" = "partIofK"
+# Plural of PNG is split into "PN" + "Gs" by the tokenizer.
+"PNGs" = "PNGs"
